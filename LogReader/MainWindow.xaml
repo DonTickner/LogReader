@@ -5,8 +5,17 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:LogReader"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
-        
+        Title="MainWindow" Height="450" Width="889.985" MinWidth="200" MinHeight="200"
+        SizeChanged="MainWindow_SizeChanged">
+    <Grid Name="LayoutGrid" ShowGridLines="False">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" MinHeight="100"/>
+            <RowDefinition Height="Auto" MinHeight="43"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" MinWidth="75"/>
+        </Grid.ColumnDefinitions>
+        <Button Name="LoadFileButton" Content="Load File" VerticalAlignment="Bottom" Margin="10,0,0,10" Grid.Row="1" Height="20" HorizontalAlignment="Left" Width="63" Click="Button_Click_1"/>
+        <TextBox Name="LineTextBox" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" TextWrapping="Wrap" Text="TextBox" Margin="10,10,10,0" Grid.Column="0" Grid.Row="0"/>
     </Grid>
 </Window>
