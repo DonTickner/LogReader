@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:LogReader"
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="889.985" MinWidth="200" MinHeight="200"
-        SizeChanged="MainWindow_SizeChanged">
+        SizeChanged="MainWindow_SizeChanged" WindowStyle="ThreeDBorderWindow">
     <Grid Name="LayoutGrid" ShowGridLines="False">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" MinHeight="100"/>
