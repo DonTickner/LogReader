@@ -1,0 +1,11 @@
+/// Create service
+sc create logforwardservice binpath="E:\Programming Stuff\LogReader\LogReader\LogForwardService\bin\Debug\netcoreapp2.2\win-x64\LogForwardService.exe"
+
+/// Start service
+sc start logforwardservice
+
+/// Stop service
+sc stop logforwardservice 
+
+/// Uninstall service
+sc delete logforwardservice 

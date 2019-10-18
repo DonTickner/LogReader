@@ -1,20 +1,13 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+using Akka.Actor;
+using Akka.Configuration;
+using Akka.Util.Internal;
 using Microsoft.Win32;
 
 namespace LogReader
@@ -29,23 +22,104 @@ namespace LogReader
         /// </summary>
         private const int ChunkSize = 1024;
 
-        private long _currentFileSizeInBytes = 0;
+        private long _currentFileSizeInBytes;
         private string _currentFile;
         private string _currentLine;
-        private int _lastVisibleLineIndex = -1;
-        private int _currentByteChunk = 0;
-
+        private int _currentByteChunk;
         private double _textBoxHeight;
+        private int _linesInFile;
+
+        #region Akka.Net
+
+        private ActorSystem _akkaActorSystem;
+
+        #endregion
 
         public MainWindow()
         {
             InitializeComponent();
+
+            InitialSetup();
         }
         
+        private void ManualScrollBar_OnScroll(object sender, ScrollEventArgs e)
+        {
+            if (_currentFileSizeInBytes > 0)
+            {
+                LoadChunkIntoTextBox();
+            }
+        }
+
+        private void LoadFileButton_Click(object sender, RoutedEventArgs e)
+        {
+            LineTextBox.Text = string.Empty;
+
+            SelectTextFileToOpen();
+            LoadChunkIntoTextBox();
+            CountLinesInFile();
+
+            manualScrollBar.Maximum = _linesInFile;
+            manualScrollBar.IsEnabled = true;
+        }
+
+        private void Button_Click_2(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(_currentFile))
+            {
+                return;
+            }
+
+            _linesInFile = 0;
+            CountLinesInFile();
+
+            MessageBox.Show($"There are {_linesInFile} in the current file {_currentFile}", "Lines in File",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (LineTextBox.ActualHeight > _textBoxHeight)
+            {
+                _textBoxHeight = LineTextBox.ActualHeight;
+                if (!string.IsNullOrEmpty(_currentFile))
+                {
+                    LoadChunkIntoTextBox();
+                }
+            }
+        }
+
+        #region Methods
+
+        #region Setup
+
+        /// <summary>
+        /// Sets up all initial work necessary for the LogReader
+        /// </summary>
+        private void InitialSetup()
+        {
+            SetupAkkaActorSystem();
+
+            manualScrollBar.Maximum = manualScrollBar.Minimum = 0;
+            manualScrollBar.IsEnabled = false;
+        }
+
+        /// <summary>
+        /// Sets up the Akka.Net Actor System
+        /// </summary>
+        private void SetupAkkaActorSystem()
+        {
+            var config = ConfigurationFactory.ParseString(@"akka.actor.default-dispatcher.shutdown { timeout = 0 }");
+            _akkaActorSystem = ActorSystem.Create("MyActorSystem", config);
+        }
+
+        #endregion
+
+        #region File Operations
+
         /// <summary>
         /// Opens a text file dialog and returns the selected file location.
         /// </summary>
-        private string SelectTextFileToOpen()
+        private void SelectTextFileToOpen()
         {
             OpenFileDialog openFileDialog = new OpenFileDialog
             {
@@ -65,8 +139,6 @@ namespace LogReader
                 {
                     throw new FileLoadException($"File '{selectedFileName}' does not exist.");
                 }
-
-                return selectedFileName;
             }
             catch (Exception e)
             {
@@ -74,27 +146,41 @@ namespace LogReader
                     MessageBoxImage.Error);
             }
 
-            return string.Empty;
+            _currentFile = selectedFileName;
+            SetCurrentFileSizeInBytes(_currentFile);
         }
 
-        private void LoadChunkIntoTextBox(bool refreshDisplay = false)
+        /// <summary>
+        /// Sets the current file's file size in bytes
+        /// </summary>
+        /// <param name="filePath">The physical path to the file.</param>
+        private void SetCurrentFileSizeInBytes(string filePath)
+        {
+            _currentFileSizeInBytes = new FileInfo(_currentFile).Length;
+        }
+
+        /// <summary>
+        /// Loads a memory chunk into the box
+        /// </summary>
+        private void LoadChunkIntoTextBox()
         {
             int currentChunkToRead = _currentByteChunk;
             byte[] buffer = new byte[ChunkSize];
 
             using (FileStream fileStream = new FileStream(_currentFile, FileMode.Open, FileAccess.Read))
             {
-                int undisplayedBytes = 0;
+                int currentLine = LineTextBox.LineCount;
 
-                while (undisplayedBytes == 0)
+                do
                 {
                     fileStream.Seek(Convert.ToInt32(currentChunkToRead), SeekOrigin.Begin);
                     fileStream.Read(buffer, 0, ChunkSize);
-                    undisplayedBytes = ReadByteChunkIntoTextBox(buffer);
+                    ReadByteChunkIntoTextBox(buffer);
                     currentChunkToRead += ChunkSize;
-                }
+                    currentLine++;
+                } while (currentLine < LineTextBox.GetLastVisibleLineIndex());
 
-                _currentByteChunk = currentChunkToRead + undisplayedBytes;
+                _currentByteChunk = currentChunkToRead;
             }
         }
 
@@ -102,80 +188,69 @@ namespace LogReader
         /// Reads the current byte array into the Text Box, and returns a bool representing if more lines can be displayed.
         /// </summary>
         /// <param name="bytesToRead">The array of bytes to be read into the Text Box.</param>
-        private int ReadByteChunkIntoTextBox(byte[] bytesToRead)
+        private void ReadByteChunkIntoTextBox(byte[] bytesToRead)
         {
-            foreach (byte b in bytesToRead)
+            for (int i = 0; i < bytesToRead.Length; i++)
             {
-                if (b != 13)
+                byte b = bytesToRead[i];
+
+                if (b != 10)
                 {
                     char currentByte = Convert.ToChar(b);
                     _currentLine += currentByte;
                     continue;
                 }
-                
-                int currentIndex = Array.IndexOf(bytesToRead, b);
-                if (currentIndex + 1 >= bytesToRead.Length)
-                {
-                    continue;
-                }
-
-                if (bytesToRead[currentIndex + 1] != 10)
-                {
-                    continue;
-                }
 
                 AddCurrentLineToTextBox();
-                if (LineTextBox.GetLastVisibleLineIndex() == _lastVisibleLineIndex)
-                {
-                    LineTextBox.VerticalScrollBarVisibility = ScrollBarVisibility.Visible;
-                    return bytesToRead.Length - currentIndex;
-                }
-
-                _lastVisibleLineIndex = LineTextBox.GetLastVisibleLineIndex();
             }
-
-            return 0;
         }
 
+        /// <summary>
+        /// Adds the content of the currentLine global variable into the text box
+        /// </summary>
         private void AddCurrentLineToTextBox()
         {
             LineTextBox.Text += _currentLine;
             _currentLine = string.Empty;
         }
 
-        private void ManualScrollBar_OnScroll(object sender, ScrollEventArgs e)
+        /// <summary>
+        /// Counts number of physical lines within the current file
+        /// </summary>
+        private void CountLinesInFile()
         {
-            if (_currentFileSizeInBytes > 0)
+            byte[] buffer = new byte[ChunkSize];
+            int bytesRead = 0;
+
+            using (FileStream fileStream = new FileStream(_currentFile, FileMode.Open, FileAccess.Read))
             {
-                LoadChunkIntoTextBox();
-            }
-            else
-            {
-                // TextBox.Text = ManualScrollBar.Value.ToString();
-            }
-        }
-
-        private void Button_Click_1(object sender, RoutedEventArgs e)
-        {
-            _currentFile = SelectTextFileToOpen();
-            _currentFileSizeInBytes = new FileInfo(_currentFile).Length;
-
-            LineTextBox.Text = string.Empty;
-            _lastVisibleLineIndex = -1;
-
-            LoadChunkIntoTextBox();
-        }
-
-        private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            if (LineTextBox.ActualHeight > _textBoxHeight)
-            {
-                _textBoxHeight = LineTextBox.ActualHeight;
-                if (!string.IsNullOrEmpty(_currentFile))
+                while (bytesRead < _currentFileSizeInBytes)
                 {
-                    LoadChunkIntoTextBox();
+                    fileStream.Seek(Convert.ToInt32(bytesRead), SeekOrigin.Begin);
+                    fileStream.Read(buffer, 0, ChunkSize);
+                    CountLinesInChunk(buffer);
+                    bytesRead += ChunkSize;
                 }
             }
+
+            manualScrollBar.Track.Minimum = 0;
+            manualScrollBar.Track.Maximum = _linesInFile;
         }
+
+        /// <summary>
+        /// Counts the number of lines in the passed byte array
+        /// </summary>
+        /// <param name="bytesToRead">The byte array that represent a memory chunk</param>
+        private void CountLinesInChunk(byte[] bytesToRead)
+        {
+            for (int i = 0; i < bytesToRead.Length; i++)
+            {
+                _linesInFile += bytesToRead[i] == 10 ? 1 : 0;
+            }
+        }
+
+        #endregion
+
+        #endregion
     }
 }

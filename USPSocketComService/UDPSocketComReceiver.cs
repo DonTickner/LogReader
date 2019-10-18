@@ -42,6 +42,7 @@ namespace UDPSocketComService
         {
             _endPointFrom = new IPEndPoint(ipAddressFrom, fromPort);
             _bufferSize = bufferSize;
+            UDPState.Buffer = new byte[_bufferSize];
         }
 
         /// <summary>
@@ -52,7 +53,8 @@ namespace UDPSocketComService
         public UDPSocketComReceiver(IPAddress serverAddress, int serverPort) : 
             this(IPAddress.Any, 0, serverAddress, serverPort, KiloByte)
         {
-
+            _bufferSize = KiloByte;
+            UDPState.Buffer = new byte[_bufferSize];
         }
 
         /// <summary>
@@ -64,7 +66,6 @@ namespace UDPSocketComService
         public UDPSocketComReceiver(IPAddress serverAddress, int serverPort, int bufferSize) :
             this(IPAddress.Any, 0, serverAddress, serverPort, bufferSize)
         {
-            
         }
 
         #endregion
