@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -8,6 +9,9 @@ using System.Windows.Controls.Primitives;
 using Akka.Actor;
 using Akka.Configuration;
 using Akka.Util.Internal;
+using LogReader.Akka.Net.Actors;
+using LogReader.Configuration;
+using LogReader.Structure;
 using Microsoft.Win32;
 
 namespace LogReader
@@ -17,21 +21,27 @@ namespace LogReader
     /// </summary>
     public partial class MainWindow : Window
     {
-        /// <summary>
-        /// The number of bytes to load in a single chunk of a file.
-        /// </summary>
-        private const int ChunkSize = 1024;
-
         private long _currentFileSizeInBytes;
         private string _currentFile;
-        private string _currentLine;
-        private int _currentByteChunk;
-        private double _textBoxHeight;
         private int _linesInFile;
-
+        
         #region Akka.Net
 
         private ActorSystem _akkaActorSystem;
+
+        private IActorRef _findStartingByteActor;
+        private IActorRef _readLineFromFileActor;
+        private IActorRef _updateDataSourceActor;
+
+        #endregion
+
+        #region Data Objects
+
+        public LogViewModel LogViewModel;
+
+        public ByteWindow onScreenLines = new ByteWindow();
+        public ByteWindow firstOnScreenLine = new ByteWindow();
+        public bool reading = false;
 
         #endregion
 
@@ -41,26 +51,6 @@ namespace LogReader
 
             InitialSetup();
         }
-        
-        private void ManualScrollBar_OnScroll(object sender, ScrollEventArgs e)
-        {
-            if (_currentFileSizeInBytes > 0)
-            {
-                LoadChunkIntoTextBox();
-            }
-        }
-
-        private void LoadFileButton_Click(object sender, RoutedEventArgs e)
-        {
-            LineTextBox.Text = string.Empty;
-
-            SelectTextFileToOpen();
-            LoadChunkIntoTextBox();
-            CountLinesInFile();
-
-            manualScrollBar.Maximum = _linesInFile;
-            manualScrollBar.IsEnabled = true;
-        }
 
         private void Button_Click_2(object sender, RoutedEventArgs e)
         {
@@ -69,23 +59,11 @@ namespace LogReader
                 return;
             }
 
-            _linesInFile = 0;
+            _linesInFile = 1;
             CountLinesInFile();
 
             MessageBox.Show($"There are {_linesInFile} in the current file {_currentFile}", "Lines in File",
                 MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-
-        private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            if (LineTextBox.ActualHeight > _textBoxHeight)
-            {
-                _textBoxHeight = LineTextBox.ActualHeight;
-                if (!string.IsNullOrEmpty(_currentFile))
-                {
-                    LoadChunkIntoTextBox();
-                }
-            }
         }
 
         #region Methods
@@ -97,10 +75,19 @@ namespace LogReader
         /// </summary>
         private void InitialSetup()
         {
+            LogViewModel = new LogViewModel();
+            ManualScrollBar.IsEnabled = false;
+            
+            SetupDataBinding();
             SetupAkkaActorSystem();
+        }
 
-            manualScrollBar.Maximum = manualScrollBar.Minimum = 0;
-            manualScrollBar.IsEnabled = false;
+        /// <summary>
+        /// Sets up all necessary work for the Data Binding
+        /// </summary>
+        private void SetupDataBinding()
+        {
+            DataContext = LogViewModel;
         }
 
         /// <summary>
@@ -110,6 +97,15 @@ namespace LogReader
         {
             var config = ConfigurationFactory.ParseString(@"akka.actor.default-dispatcher.shutdown { timeout = 0 }");
             _akkaActorSystem = ActorSystem.Create("MyActorSystem", config);
+
+            Props updateDataSourceActorProps = Props.Create(() => new UpdateDataSourceActor(this)).WithDispatcher("akka.actor.synchronized-dispatcher");
+            _updateDataSourceActor = _akkaActorSystem.ActorOf(updateDataSourceActorProps, $"updateDataSource_{Guid.NewGuid()}");
+
+            Props readLineFromFileActorProps = Props.Create(() => new ReadLineFromFileActor(_updateDataSourceActor));
+            _readLineFromFileActor = _akkaActorSystem.ActorOf(readLineFromFileActorProps, $"readLineFromFile_{Guid.NewGuid()}");
+
+            Props findStartingByteLocationActorProps = Props.Create(() => new FindByteLocationActor(_readLineFromFileActor));
+            _findStartingByteActor = _akkaActorSystem.ActorOf(findStartingByteLocationActorProps, $"findStartingByteLocation_{Guid.NewGuid()}");
         }
 
         #endregion
@@ -147,7 +143,7 @@ namespace LogReader
             }
 
             _currentFile = selectedFileName;
-            SetCurrentFileSizeInBytes(_currentFile);
+            _linesInFile = 1;
         }
 
         /// <summary>
@@ -158,68 +154,13 @@ namespace LogReader
         {
             _currentFileSizeInBytes = new FileInfo(_currentFile).Length;
         }
-
-        /// <summary>
-        /// Loads a memory chunk into the box
-        /// </summary>
-        private void LoadChunkIntoTextBox()
-        {
-            int currentChunkToRead = _currentByteChunk;
-            byte[] buffer = new byte[ChunkSize];
-
-            using (FileStream fileStream = new FileStream(_currentFile, FileMode.Open, FileAccess.Read))
-            {
-                int currentLine = LineTextBox.LineCount;
-
-                do
-                {
-                    fileStream.Seek(Convert.ToInt32(currentChunkToRead), SeekOrigin.Begin);
-                    fileStream.Read(buffer, 0, ChunkSize);
-                    ReadByteChunkIntoTextBox(buffer);
-                    currentChunkToRead += ChunkSize;
-                    currentLine++;
-                } while (currentLine < LineTextBox.GetLastVisibleLineIndex());
-
-                _currentByteChunk = currentChunkToRead;
-            }
-        }
-
-        /// <summary>
-        /// Reads the current byte array into the Text Box, and returns a bool representing if more lines can be displayed.
-        /// </summary>
-        /// <param name="bytesToRead">The array of bytes to be read into the Text Box.</param>
-        private void ReadByteChunkIntoTextBox(byte[] bytesToRead)
-        {
-            for (int i = 0; i < bytesToRead.Length; i++)
-            {
-                byte b = bytesToRead[i];
-
-                if (b != 10)
-                {
-                    char currentByte = Convert.ToChar(b);
-                    _currentLine += currentByte;
-                    continue;
-                }
-
-                AddCurrentLineToTextBox();
-            }
-        }
-
-        /// <summary>
-        /// Adds the content of the currentLine global variable into the text box
-        /// </summary>
-        private void AddCurrentLineToTextBox()
-        {
-            LineTextBox.Text += _currentLine;
-            _currentLine = string.Empty;
-        }
-
+        
         /// <summary>
         /// Counts number of physical lines within the current file
         /// </summary>
         private void CountLinesInFile()
         {
-            byte[] buffer = new byte[ChunkSize];
+            byte[] buffer = new byte[ProgramConfig.ChunkSize];
             int bytesRead = 0;
 
             using (FileStream fileStream = new FileStream(_currentFile, FileMode.Open, FileAccess.Read))
@@ -227,14 +168,11 @@ namespace LogReader
                 while (bytesRead < _currentFileSizeInBytes)
                 {
                     fileStream.Seek(Convert.ToInt32(bytesRead), SeekOrigin.Begin);
-                    fileStream.Read(buffer, 0, ChunkSize);
+                    fileStream.Read(buffer, 0, ProgramConfig.ChunkSize);
                     CountLinesInChunk(buffer);
-                    bytesRead += ChunkSize;
+                    bytesRead += ProgramConfig.ChunkSize;
                 }
             }
-
-            manualScrollBar.Track.Minimum = 0;
-            manualScrollBar.Track.Maximum = _linesInFile;
         }
 
         /// <summary>
@@ -245,11 +183,94 @@ namespace LogReader
         {
             for (int i = 0; i < bytesToRead.Length; i++)
             {
-                _linesInFile += bytesToRead[i] == 10 ? 1 : 0;
+                _linesInFile += bytesToRead[i] == ProgramConfig.LineFeedByte ? 1 : 0;
             }
         }
 
         #endregion
+
+        #endregion
+
+        #region Events
+
+        private void LoadFileButton_Click(object sender, RoutedEventArgs e)
+        {
+            SelectTextFileToOpen();
+            SetCurrentFileSizeInBytes(_currentFile);
+
+            LineTextBox.Text = string.Empty;
+
+            ManualScrollBar.Maximum = _currentFileSizeInBytes / 10;
+            ManualScrollBar.Minimum = 0;
+            ManualScrollBar.IsEnabled = true;
+
+            onScreenLines.StartingByte = 0;
+            firstOnScreenLine.StartingByte = _currentFileSizeInBytes;
+
+            ManualScrollBar.Value = ManualScrollBar.Minimum;
+
+            _readLineFromFileActor.Tell(new ReadLineFromFileActorMessages.ReadLineFromFileStartingAtByte(_currentFile, 0, false));
+        }
+
+        private void LineTextBox_OnTextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (reading 
+                && LineTextBox.LineCount < 20)
+            {
+                _readLineFromFileActor.Tell(new ReadLineFromFileActorMessages.ReadLineFromFileStartingAtByte(_currentFile, onScreenLines.EndingByte, false));
+                ByteWindowLabel.Content = $"{onScreenLines.StartingByte} - {onScreenLines.EndingByte} / {_currentFileSizeInBytes}";
+            }
+            else
+            {
+                reading = false;
+            }
+        }
+
+        private void ManualScrollBar_OnScroll(object sender, ScrollEventArgs e)
+        {
+            if (reading ||
+                e.ScrollEventType == ScrollEventType.EndScroll)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            LineTextBox.Text = string.Empty;
+            firstOnScreenLine.StartingByte = -1;
+            reading = true;
+
+            if (e.ScrollEventType == ScrollEventType.SmallIncrement)
+            {
+                _readLineFromFileActor.Tell(new ReadLineFromFileActorMessages.ReadLineFromFileStartingAtByte(_currentFile, firstOnScreenLine.EndingByte, true));
+            }
+            else
+            {
+                int numberOfInstancesToFind = e.ScrollEventType == ScrollEventType.SmallDecrement ? 2 : 1;
+                bool overrideUI = false;
+
+                if (e.ScrollEventType != ScrollEventType.SmallDecrement)
+                {
+                    onScreenLines.StartingByte =
+                        Math.Max(0, Math.Min(_currentFileSizeInBytes, (long)(e.NewValue * 10)));
+                }
+                else
+                {
+                    overrideUI = true;
+                }
+
+                _findStartingByteActor.Tell(new FindByteLocationActorMessages.FindByteLocationInFile(onScreenLines.StartingByte,
+                    ProgramConfig.LineFeedByte,
+                    FindByteLocationActorMessages.SearchDirection.Backward,
+                    _currentFile,
+                    numberOfInstancesToFind,
+                    overrideUI));
+            }
+        }
+
+        private void ManualScrollBar_OnValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            ScrollValueLabel.Content = e.NewValue;
+        }
 
         #endregion
     }
