@@ -83,7 +83,7 @@ namespace Log4Net.Extensions.Configuration.Implementation
 
             foreach (XElement appender in appenders)
             {
-                _log4NetCongConfig.Appenders.Add(LoadAppenderFromElement(appender));
+                _log4NetCongConfig.AddAppender(LoadAppenderFromElement(appender));
             }
         }
 
