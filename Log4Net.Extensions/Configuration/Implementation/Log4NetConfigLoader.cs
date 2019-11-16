@@ -15,14 +15,21 @@ namespace Log4Net.Extensions.Configuration.Implementation
     /// </summary>
     public static class Log4NetConfigLoader
     {
+        #region Fields
+
         /// <summary>
         /// The Log4Net config file to be loaded.
         /// </summary>
         private static XDocument _configFile;
+
         /// <summary>
         /// The <see cref="Log4NetConfig"/> to be created and returned.
         /// </summary>
         private static Log4NetConfig _log4NetCongConfig;
+
+        #endregion
+        
+        #region Methods
 
         /// <summary>
         /// Creates a <see cref="Log4NetConfig"/> object from a physical Log4Net config file.
@@ -66,6 +73,8 @@ namespace Log4Net.Extensions.Configuration.Implementation
                 throw new InvalidLog4NetConfigStructureException("Unable to locate <log4net> node within config file. Please review file structure and try again.");
             }
         }
+        
+        #region Load Appender Methods
 
         /// <summary>
         /// Loads all <see cref="Appender"/>s present in the Log4Net Config file.
@@ -110,6 +119,8 @@ namespace Log4Net.Extensions.Configuration.Implementation
             return newAppender;
         }
 
+        #endregion
+
         #region XElement Retrieval Methods
 
         /// <summary>
@@ -129,7 +140,22 @@ namespace Log4Net.Extensions.Configuration.Implementation
         /// <param name="descendantName">The <see cref="string"/> Name value to use to locate the Descendants.</param>
         private static IEnumerable<XElement> RetrieveElementDescendantsByName(XElement element, string descendantName)
         {
-            return element.Descendants().Where(d => d.Name == descendantName);
+            List<XElement> matchedDescendants = new List<XElement>();
+            foreach (XElement descendant in element.Descendants())
+            {
+                string name = descendant.Name.ToString();
+                if (descendant.Name == AppenderDescendants.Param)
+                {
+                    name = RetrieveElementAttributeValue(descendant, "name");
+                }
+
+                if (string.Equals(name, descendantName, StringComparison.CurrentCultureIgnoreCase))
+                {
+                    matchedDescendants.Add(descendant);
+                }
+            }
+
+            return matchedDescendants;
         }
 
         /// <summary>
@@ -200,14 +226,16 @@ namespace Log4Net.Extensions.Configuration.Implementation
         /// <param name="appenderElement">The <see cref="XElement"/> that represents an appender element.</param>
         private static AppenderType LoadAppenderTypeFromElement(XElement appenderElement)
         {
-            string typeString = RetrieveElementAttributeValue(appenderElement, AppenderAttributes.Type).Replace("log4net.Appender.", "");
+            string typeStringValue = RetrieveElementAttributeValue(appenderElement, AppenderAttributes.Type).Replace("log4net.Appender.", "");
+            string[] typeComponents = typeStringValue.Split(',');
+            string appenderTypeValue = typeComponents[0];
 
-            if (Enum.TryParse(typeString, out AppenderType returnType))
+            if (Enum.TryParse(appenderTypeValue, out AppenderType returnType))
             {
                 return returnType;
             }
 
-            throw new InvalidLog4NetConfigAttributeValueException($"<appender> element contained a 'type' with value '{typeString}'. This is not a supported Appender.");
+            throw new InvalidLog4NetConfigAttributeValueException($"<appender> element contained a 'type' with value '{appenderTypeValue}'. This is not a supported Appender.");
         }
 
         /// <summary>
@@ -304,7 +332,6 @@ namespace Log4Net.Extensions.Configuration.Implementation
         /// <param name="appenderElement">The <see cref="XElement"/> that represents an appender element.</param>
         private static AppenderConversionPattern LoadAppenderConversionPatternFromElement(XElement appenderElement)
         {
-            string conversionPattern = string.Empty;
             XElement conversionPatternDescendant =
                 RetrieveElementDescendantsByName(appenderElement, AppenderDescendants.ConversionPattern).FirstOrDefault();
 
@@ -313,7 +340,7 @@ namespace Log4Net.Extensions.Configuration.Implementation
                 throw new InvalidLog4NetConfigStructureException($"Unable to locate a <param> element with name of '{AppenderDescendants.ConversionPattern}'. Unable to proceed.");
             }
 
-            conversionPattern = RetrieveElementAttributeValue(conversionPatternDescendant);
+            string conversionPattern = RetrieveElementAttributeValue(conversionPatternDescendant);
 
             AppenderConversionPattern newAppenderConversionPattern = new AppenderConversionPattern()
             {
@@ -402,6 +429,8 @@ namespace Log4Net.Extensions.Configuration.Implementation
 
             return newAppenderConversionPattern;
         }
+
+        #endregion
 
         #endregion
     }

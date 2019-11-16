@@ -45,6 +45,11 @@ namespace Log4Net.Extensions.Configuration.Implementation.ConfigObjects
         public static string StaticLogFileName => "staticlogfilename";
 
         /// <summary>
+        /// The attribute value an <see cref="AppenderLayout"/> paramter.
+        /// </summary>
+        public static string Param => "param";
+
+        /// <summary>
         /// Returns a collection of all <see cref="Appender"/> Descendant Node Names
         /// </summary>
         public static IEnumerable<string> AllDescendantNames => new List<string> {File, ConversionPattern, Header, Footer, Layout, DatePattern, StaticLogFileName};

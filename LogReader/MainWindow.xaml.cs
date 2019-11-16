@@ -9,8 +9,10 @@ using System.Windows.Controls.Primitives;
 using Akka.Actor;
 using Akka.Configuration;
 using Akka.Util.Internal;
+using Log4Net.Extensions.Configuration.Implementation;
 using LogReader.Akka.Net.Actors;
 using LogReader.Configuration;
+using LogReader.Log4Net;
 using LogReader.Structure;
 using Microsoft.Win32;
 
@@ -37,8 +39,8 @@ namespace LogReader
 
         #region Data Objects
 
+        private Log4NetConfig _log4NetConfig;
         public LogViewModel LogViewModel;
-
         public ByteWindow onScreenLines = new ByteWindow();
         public ByteWindow firstOnScreenLine = new ByteWindow();
         public bool reading = false;
@@ -117,6 +119,15 @@ namespace LogReader
         /// </summary>
         private void SelectTextFileToOpen()
         {
+            _currentFile = string.Empty;
+
+            Log4NetOpenFileDialog log4NetOpenFileDialog = new Log4NetOpenFileDialog();
+            log4NetOpenFileDialog.ShowDialog();
+            if (log4NetOpenFileDialog.Log4NetConfigFileSuccessfullyLoaded)
+            {
+                _log4NetConfig = log4NetOpenFileDialog.Log4NetConfig;
+            }
+
             OpenFileDialog openFileDialog = new OpenFileDialog
             {
                 Title = "Open Text File",
@@ -126,7 +137,14 @@ namespace LogReader
                 CheckPathExists = true
             };
 
-            openFileDialog.ShowDialog();
+            bool? openDialogResult = openFileDialog.ShowDialog();
+
+            if (null == openDialogResult
+                || (openDialogResult.HasValue && !openDialogResult.Value))
+            {
+                return;
+            }
+            
             string selectedFileName = openFileDialog.FileName;
 
             try
@@ -196,6 +214,11 @@ namespace LogReader
         private void LoadFileButton_Click(object sender, RoutedEventArgs e)
         {
             SelectTextFileToOpen();
+            if (string.IsNullOrEmpty(_currentFile))
+            {
+                return;
+            }
+
             SetCurrentFileSizeInBytes(_currentFile);
 
             LineTextBox.Text = string.Empty;

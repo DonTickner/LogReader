@@ -13,7 +13,6 @@ using log4net.Core;
 using log4net.Repository;
 using log4net.Repository.Hierarchy;
 using LogForwardService.Service.Config.Section;
-using UDPSocketComService;
 
 namespace LogForwardService.Service
 {
@@ -21,7 +20,6 @@ namespace LogForwardService.Service
     {
         private static readonly log4net.ILog Log = log4net.LogManager.GetLogger(typeof(LogForwardService));
 
-        private UDPSocketComReceiver _udpReceiver;
         private IPAddress _serviceIpAddress;
         private int _servicePort;
         private int _bufferSize;
@@ -43,8 +41,7 @@ namespace LogForwardService.Service
 
             try
             {
-                _udpReceiver = new UDPSocketComReceiver(_serviceIpAddress, _servicePort);
-                _udpReceiver.BeginReceive();
+
             }
             catch (Exception e)
             {
@@ -53,14 +50,6 @@ namespace LogForwardService.Service
 
 
             Log.Debug($"Start process completed.");
-            if (null != _udpReceiver)
-            {
-                Log.Debug($"UDPSocketComReceiver successfully started on IP {_serviceIpAddress}:{_servicePort}");
-            }
-            else
-            {
-                Log.Error($"UDPSocketComReceiver not started.");
-            }
         }
 
         protected override void OnStop()
