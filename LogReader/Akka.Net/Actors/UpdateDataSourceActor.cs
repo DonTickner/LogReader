@@ -59,9 +59,9 @@ namespace LogReader.Akka.Net.Actors
             }
             _dataSourceToUpdate.LogViewModel.AddLine(message.ReturnedLine);
 
-            long startingByte = message.ReturnedLine.LineEndsAtByteLocation + 1;
+            long startingByte = message.ReturnedLine.LineEndsAtByteLocation;
 
-            if (_dataSourceToUpdate.LogViewModel.NeedToReadMoreLines)
+            if (_dataSourceToUpdate.LogViewModel.IsReading) 
             {
                 Sender.Tell(
                     new ReadLineFromFileActorMessages.ReadLineFromFileStartingAtByte(

@@ -4,23 +4,22 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using Akka.Dispatch.SysMsg;
 using LogReader.Akka.Net.Actors;
+using LogReader.Annotations;
 using LogReader.Configuration;
 
 namespace LogReader.Structure
 {
-    public class LogViewModel: NotifyPropertyChanged
+    public class LogViewModel: INotifyPropertyChanged
     {
         private int _currentLineToUpdate = 0;
 
-        private List<long> _logLineStartBytes { get; set; }
-
-        private List<long> _logLineEndBytes { get; set; }
-
-        private const int MaximumLines = 20;
-
+        private readonly List<ByteWindow> _onScreenlogLines;
+        
         private ObservableCollection<LogLine> _logLines = new ObservableCollection<LogLine>();
         public ObservableCollection<LogLine> LogLines
         {
@@ -28,15 +27,12 @@ namespace LogReader.Structure
             set
             {
                 _logLines = value;
-                OnPropertyChanged(nameof(LogLines));
             }
         }
 
-        public ByteWindow OnScreenLines { get; private set; }
+        public long FirstLineStartingByte => _onScreenlogLines[0].StartingByte;
 
-        public long FirstLineStartingByte => _logLineStartBytes[0];
-
-        public long FirstLineEndingByte => _logLineStartBytes[LogLines.Count - 1];
+        public long FirstLineEndingByte => _onScreenlogLines[0].EndingByte;
 
         private List<Tuple<string, long>> _logFileLocations;
 
@@ -47,6 +43,11 @@ namespace LogReader.Structure
             get { return _logFileLocations.Sum(l => l.Item2); }
         }
 
+        public long CalculatedScrollableMaximum
+        {
+            get { return _logFileLocations.Sum(l => l.Item2) / 10; }
+        }
+
         public long TotalLinesInFiles
         {
             get { return _logFileLines.Sum(l => l.Item2); }
@@ -54,18 +55,18 @@ namespace LogReader.Structure
 
         public int TotalNumberOfLogFiles => _logFileLocations.Count;
 
-        public bool NeedToReadMoreLines => _currentLineToUpdate < MaximumLines;
+        public bool IsReading => (_currentLineToUpdate <= LogLines.Count && ExpandingView) 
+                                           || (_currentLineToUpdate < LogLines.Count && !ExpandingView);
+
+        public bool ExpandingView = true;
 
         public LogViewModel()
         {
             LogLines = new ObservableCollection<LogLine>();
-            _logLineStartBytes = new List<long>();
-            _logLineEndBytes = new List<long>();
 
+            _onScreenlogLines = new List<ByteWindow>();
             _logFileLines = new List<Tuple<string, int>>();
             _logFileLocations = new List<Tuple<string, long>>();
-
-            OnScreenLines = new ByteWindow();
         }
 
         /// <summary>
@@ -74,29 +75,23 @@ namespace LogReader.Structure
         /// <param name="lineToAdd">The <see cref="string"/> to be added.</param>
         public void AddLine(ReadLineFromFileActor.ReturnedLine lineToAdd)
         {
-            if (LogLines.Count >= MaximumLines)
+            ByteWindow newLine =
+                CreateNewByteWindow(lineToAdd.LineStartsAtByteLocation, lineToAdd.LineEndsAtByteLocation);
+
+            if (!ExpandingView)
             {
-                int zeroIndex = Math.Max(0, _currentLineToUpdate - 1);
-                _logLines[zeroIndex] = CreateNewLogLine(lineToAdd);
-                _logLineStartBytes[zeroIndex] = lineToAdd.LineStartsAtByteLocation;
-                _logLineEndBytes[zeroIndex] = lineToAdd.LineEndsAtByteLocation;
+                int zeroBasedLogLineIndex = Math.Max(0, _currentLineToUpdate - 1);
+
+                _logLines[zeroBasedLogLineIndex] = CreateNewLogLine(lineToAdd);
+                _onScreenlogLines[zeroBasedLogLineIndex] = newLine;
             }
             else
-            {
-                if (!LogLines.Any())
-                {
-                    OnScreenLines.StartingByte = lineToAdd.LineStartsAtByteLocation;
-                }
-
+            { 
                 _logLines.Add(CreateNewLogLine(lineToAdd));
-                _logLineStartBytes.Add(lineToAdd.LineStartsAtByteLocation);
-                _logLineEndBytes.Add(lineToAdd.LineEndsAtByteLocation);
+                _onScreenlogLines.Add(newLine);
             }
 
-            OnScreenLines.EndingByte = lineToAdd.LineEndsAtByteLocation;
-            _currentLineToUpdate = Math.Min(_currentLineToUpdate + 1, MaximumLines);
-
-            OnPropertyChanged(nameof(LogLines));
+            _currentLineToUpdate = Math.Min(_currentLineToUpdate + 1, LogLines.Count);
         }
 
         private LogLine CreateNewLogLine(ReadLineFromFileActor.ReturnedLine line)
@@ -111,6 +106,7 @@ namespace LogReader.Structure
         {
             _logFileLocations = logFileLocations;
             CountLinesInFiles();
+            OnPropertyChanged(nameof(CalculatedScrollableMaximum));
         }
 
         public string LocateLogFileFromByteReference(long byteLocation)
@@ -178,6 +174,29 @@ namespace LogReader.Structure
         public void InitiateNewRead()
         {
             _currentLineToUpdate = 0;
+        }
+
+        private ByteWindow CreateNewByteWindow(long start, long end)
+        {
+            return new ByteWindow
+            {
+                StartingByte = start,
+                EndingByte = end
+            };
+        }
+
+        public void ResetUserInterface()
+        {
+            InitiateNewRead();
+            _logLines.Clear();
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        [NotifyPropertyChangedInvocator]
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 }
