@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Controls;
+using Akka.Actor;
 
 namespace LogReader.Akka.Net.Actors
 {
@@ -52,25 +53,22 @@ namespace LogReader.Akka.Net.Actors
 
         private void AddLineToDataSource(UpdateDataSourceActorMessage.AddLineToDataSource message)
         {
-            _dataSourceToUpdate.reading = !message.ReturnedLine.LastLine;
-
             if (message.OverrideUI)
             {
                 _dataSourceToUpdate.ManualScrollBar.Value = message.ReturnedLine.LineStartsAtByteLocation / 10;
             }
-
-            if (_dataSourceToUpdate.firstOnScreenLine.StartingByte == -1)
-            {
-                _dataSourceToUpdate.firstOnScreenLine.StartingByte = message.ReturnedLine.LineStartsAtByteLocation;
-                _dataSourceToUpdate.firstOnScreenLine.EndingByte = message.ReturnedLine.LineEndsAtByteLocation;
-                _dataSourceToUpdate.onScreenLines.StartingByte = message.ReturnedLine.LineStartsAtByteLocation;
-            }
-
             _dataSourceToUpdate.LogViewModel.AddLine(message.ReturnedLine);
 
-            _dataSourceToUpdate.onScreenLines.EndingByte = message.ReturnedLine.LineEndsAtByteLocation;
-            _dataSourceToUpdate.LineTextBox.Text += message.ReturnedLine.Line;
+            long startingByte = message.ReturnedLine.LineEndsAtByteLocation + 1;
 
+            if (_dataSourceToUpdate.LogViewModel.NeedToReadMoreLines)
+            {
+                Sender.Tell(
+                    new ReadLineFromFileActorMessages.ReadLineFromFileStartingAtByte(
+                        _dataSourceToUpdate.LogViewModel.LocateLogFileFromByteReference(startingByte)
+                        , startingByte,
+                        false));
+            }
         }
     }
 }

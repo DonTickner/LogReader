@@ -53,6 +53,9 @@ namespace LogReader.Akka.Net.Actors
 
             public bool CompletedRead { get; set; }
 
+            /// <summary>
+            /// Represents if the line returned is the last line in the file.
+            /// </summary>
             public bool LastLine { get; set; }
         }
 

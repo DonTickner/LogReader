@@ -111,8 +111,9 @@ namespace Log4Net.Extensions.Configuration.Implementation
             {
                 Type = LoadAppenderTypeFromElement(appenderElement),
                 FolderPath = LoadAppenderFolderPathFromElement(appenderElement),
-                FileNameMask = LoadAppenderFileMaskFromElement(appenderElement),
-                StaticLogFileName = LoadAppenderStaticLogFileNameFromElement(appenderElement),
+                RollingFileNameMask = LoadAppenderRollingFileMaskFromElement(appenderElement),
+                StaticFileNameMask = LoadAppenderStaticFileNameMaskFromElement(appenderElement),
+                UseStaticLogFileName = LoadAppenderUseStaticLogFileNameFromElement(appenderElement),
                 Layout = LoadAppenderLayoutFromElement(appenderElement)
             };
 
@@ -260,7 +261,25 @@ namespace Log4Net.Extensions.Configuration.Implementation
         /// Retrieves the FileMask from a Log4Net config file 'appender' element.
         /// </summary>
         /// <param name="appenderElement">The <see cref="XElement"/> that represents an appender element.</param>
-        private static string LoadAppenderFileMaskFromElement(XElement appenderElement)
+        private static string LoadAppenderRollingFileMaskFromElement(XElement appenderElement)
+        {
+            string staticFileName = LoadAppenderStaticFileNameMaskFromElement(appenderElement);
+
+            string datePatternValue = RetrieveAppenderDatePatternValue(appenderElement);
+            if (!string.IsNullOrEmpty(datePatternValue))
+            {
+                datePatternValue = datePatternValue.Replace("'", "");
+                return staticFileName + datePatternValue;
+            }
+
+            return staticFileName;
+        }
+
+        /// <summary>
+        /// Retrieves the Static FileMask from a Log4Net config file 'appender' element.
+        /// </summary>
+        /// <param name="appenderElement">The <see cref="XElement"/> that represents an appender element.</param>
+        private static string LoadAppenderStaticFileNameMaskFromElement(XElement appenderElement)
         {
             string fileNodeValue = RetrieveAppenderFilePathValue(appenderElement);
 
@@ -273,21 +292,14 @@ namespace Log4Net.Extensions.Configuration.Implementation
             int locationOfBeginningOfFileName = fileNodeValue.LastIndexOf(escapedBackSlash) + escapedBackSlash.ToString().Length;
             string startOfLog4NetFileNameMask = fileNodeValue.Substring(locationOfBeginningOfFileName);
 
-            string datePatternValue = RetrieveAppenderDatePatternValue(appenderElement);
-            if (!string.IsNullOrEmpty(datePatternValue))
-            {
-                datePatternValue = datePatternValue.Replace("'", "");
-                return startOfLog4NetFileNameMask + datePatternValue;
-            }
-
             return startOfLog4NetFileNameMask;
         }
 
         /// <summary>
-        /// Retrieves the StaticLogFileName from a Log4Net config file 'appender' element.
+        /// Retrieves the UseStaticLogFileName from a Log4Net config file 'appender' element.
         /// </summary>
         /// <param name="appenderElement">The <see cref="XElement"/> that represents an appender element.</param>
-        private static bool LoadAppenderStaticLogFileNameFromElement(XElement appenderElement)
+        private static bool LoadAppenderUseStaticLogFileNameFromElement(XElement appenderElement)
         {
             return RetrieveAppenderStaticLogFileNameValue(appenderElement);
         }

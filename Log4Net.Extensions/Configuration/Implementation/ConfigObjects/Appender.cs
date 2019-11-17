@@ -20,14 +20,19 @@ namespace Log4Net.Extensions.Configuration.Implementation.ConfigObjects
         public string FolderPath { get; set; }
 
         /// <summary>
-        /// The string value that represents the base File Name Mask that all Log4Net Config Files will match.
+        /// The string value that represents the File Name Mask, including any rolling name appending, that all Log4Net Config Files will match.
         /// </summary>
-        public string FileNameMask { get; set; }
+        public string RollingFileNameMask { get; set; }
+
+        /// <summary>
+        /// The string value that represents the File Name Mask, excluding any rolling name appending, that all Log4Net Config Files will match.
+        /// </summary>
+        public string StaticFileNameMask { get; set; }
 
         /// <summary>
         /// Determines if the <see cref="Appender"/> will write to one statically named file.
         /// </summary>
-        public bool StaticLogFileName { get; set; }
+        public bool UseStaticLogFileName { get; set; }
 
         /// <summary>
         /// The Layout of the log record this <see cref="Appender"/> will create.

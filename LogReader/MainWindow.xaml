@@ -6,7 +6,8 @@
         xmlns:local="clr-namespace:LogReader"
         mc:Ignorable="d"
         Title="MainWindow" Height="428.93" Width="1116.024" MinWidth="200" MinHeight="200"
-        WindowStyle="ThreeDBorderWindow">
+        WindowStyle="ThreeDBorderWindow"
+        Loaded="MainWindow_OnLoaded">
     <Grid Name="LayoutGrid" ShowGridLines="False" Margin="0,0,2,0">
         <Grid.RowDefinitions>
             <RowDefinition MinHeight="100"/>
@@ -14,16 +15,17 @@
             <RowDefinition Height="Auto" MinHeight="43"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" MinWidth="75"/>
-            <ColumnDefinition Width="*" MinWidth="75"/>
+            <ColumnDefinition Width="660*" MinWidth="75"/>
+            <ColumnDefinition Width="159*"/>
+            <ColumnDefinition Width="295*" MinWidth="75"/>
         </Grid.ColumnDefinitions>
         <Button Name="LoadFileButton" Content="Load File" VerticalAlignment="Bottom" Margin="10,0,0,10" Grid.Row="1" Height="20" HorizontalAlignment="Left" Width="63" Click="LoadFileButton_Click"/>
-        <TextBox Name="LineTextBox" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="10,10,10,0" Grid.Column="0" Grid.Row="0" TextChanged="LineTextBox_OnTextChanged" Visibility="Hidden"/>
-        <ScrollBar Name="ManualScrollBar" Margin="0,10,10,0" Width="17" HorizontalAlignment="Right" Scroll="ManualScrollBar_OnScroll" ValueChanged="ManualScrollBar_OnValueChanged" Grid.Column="1"/>
+        <TextBox Name="LineTextBox" Margin="10,10,10,43" Grid.Column="0" Grid.Row="0" Visibility="Hidden" Grid.RowSpan="2" Grid.ColumnSpan="2"/>
+        <ScrollBar Name="ManualScrollBar" Margin="0,10,10,43" Width="17" HorizontalAlignment="Right" Scroll="ManualScrollBar_OnScroll" ValueChanged="ManualScrollBar_OnValueChanged" Grid.Column="2" Grid.RowSpan="2"/>
         <Button Name="CountLinesInFileButton" Content="Count Lines in Current File" HorizontalAlignment="Left" Width="160" Margin="78,13,0,10" Grid.Row="1" Click="Button_Click_2"/>
-        <Label Name="ByteWindowLabel" Content="Label" Margin="10,7,0,10" Grid.Row="2" HorizontalContentAlignment="Left" HorizontalAlignment="Left" Width="142"/>
-        <Label Name="ScrollValueLabel"  Content="Label" Margin="0,7,10,10" Grid.Row="2" RenderTransformOrigin="1.382,0.582" HorizontalAlignment="Right" Width="200" HorizontalContentAlignment="Right"/>
-        <DataGrid x:Name="Lines" Grid.Column="1" Margin="0,10,32,0" ItemsSource="{Binding LogLines}">
-        </DataGrid>
+        <Label Name="ByteWindowLabel" Content="Label" Margin="10,7,0,10" Grid.Row="2" HorizontalContentAlignment="Left" HorizontalAlignment="Left" Width="315"/>
+        <Label Name="ScrollValueLabel"  Content="Label" Margin="0,7,10,10" Grid.Row="2" RenderTransformOrigin="1.382,0.582" HorizontalAlignment="Right" Width="200" HorizontalContentAlignment="Right" Grid.ColumnSpan="2"/>
+        <Label x:Name="FileLocationWindowLabel" Content="Label" Margin="10,7,0,10" Grid.Row="2" HorizontalContentAlignment="Left" HorizontalAlignment="Left" Width="267" Grid.Column="2"/>
+        <DataGrid x:Name="Lines" Margin="10,10,10,43" ItemsSource="{Binding LogLines}" AutoGenerateColumns="True" Grid.RowSpan="2" Grid.ColumnSpan="2"/>
     </Grid>
 </Window>
