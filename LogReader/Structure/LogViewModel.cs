@@ -55,8 +55,7 @@ namespace LogReader.Structure
 
         public int TotalNumberOfLogFiles => _logFileLocations.Count;
 
-        public bool IsReading => (_currentLineToUpdate <= LogLines.Count && ExpandingView) 
-                                           || (_currentLineToUpdate < LogLines.Count && !ExpandingView);
+        public bool IsReading => _currentLineToUpdate <= LogLines.Count + 1;
 
         public bool ExpandingView = true;
 
@@ -82,8 +81,11 @@ namespace LogReader.Structure
             {
                 int zeroBasedLogLineIndex = Math.Max(0, _currentLineToUpdate - 1);
 
-                _logLines[zeroBasedLogLineIndex] = CreateNewLogLine(lineToAdd);
-                _onScreenlogLines[zeroBasedLogLineIndex] = newLine;
+                if (zeroBasedLogLineIndex < _logLines.Count)
+                {
+                    _logLines[zeroBasedLogLineIndex] = CreateNewLogLine(lineToAdd);
+                    _onScreenlogLines[zeroBasedLogLineIndex] = newLine;
+                }
             }
             else
             { 
@@ -91,7 +93,7 @@ namespace LogReader.Structure
                 _onScreenlogLines.Add(newLine);
             }
 
-            _currentLineToUpdate = Math.Min(_currentLineToUpdate + 1, LogLines.Count);
+            _currentLineToUpdate++;
         }
 
         private LogLine CreateNewLogLine(ReadLineFromFileActor.ReturnedLine line)
@@ -173,7 +175,7 @@ namespace LogReader.Structure
 
         public void InitiateNewRead()
         {
-            _currentLineToUpdate = 0;
+            _currentLineToUpdate = 1;
         }
 
         private ByteWindow CreateNewByteWindow(long start, long end)
