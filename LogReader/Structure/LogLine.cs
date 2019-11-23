@@ -12,5 +12,8 @@ namespace LogReader.Structure
     public class LogLine
     {
         public string Line { get; set; }
+        public long StartingByte { get; set; }
+        public long EndingByte { get; set; }
+        public string File { get; set; }
     }
 }

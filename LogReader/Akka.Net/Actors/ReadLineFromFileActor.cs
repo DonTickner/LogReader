@@ -45,6 +45,7 @@ namespace LogReader.Akka.Net.Actors
     {
         public class ReturnedLine
         {
+            public string FilePath { get; set; }
             public string Line { get; set; }
 
             public long LineEndsAtByteLocation { get; set; }
@@ -95,7 +96,8 @@ namespace LogReader.Akka.Net.Actors
                 Line = string.Empty,
                 LineEndsAtByteLocation = chunkStartingAtByte,
                 LineStartsAtByteLocation = message.StartingByteNumber,
-                CompletedRead = false
+                CompletedRead = false,
+                FilePath = message.FilePath
             };
 
             using (FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read))

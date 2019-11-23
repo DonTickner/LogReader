@@ -57,16 +57,21 @@ namespace LogReader.Akka.Net.Actors
             {
                 _dataSourceToUpdate.ManualScrollBar.Value = message.ReturnedLine.LineStartsAtByteLocation / 10;
             }
+
             _dataSourceToUpdate.LogViewModel.AddLine(message.ReturnedLine);
 
             long startingByte = message.ReturnedLine.LineEndsAtByteLocation;
 
-            if (_dataSourceToUpdate.LogViewModel.IsReading) 
+            if (_dataSourceToUpdate.LogViewModel.IsReading)
             {
+                long relativeReference =
+                    _dataSourceToUpdate.LogViewModel.CreateRelativeByteReference(startingByte,
+                        message.ReturnedLine.FilePath);
+
                 Sender.Tell(
                     new ReadLineFromFileActorMessages.ReadLineFromFileStartingAtByte(
-                        _dataSourceToUpdate.LogViewModel.LocateLogFileFromByteReference(startingByte)
-                        , startingByte,
+                        _dataSourceToUpdate.LogViewModel.LocateLogFileFromByteReference(relativeReference),
+                        _dataSourceToUpdate.LogViewModel.TranslateRelativeBytePosition(relativeReference),
                         false));
             }
         }

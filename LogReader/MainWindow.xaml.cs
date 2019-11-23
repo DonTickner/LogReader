@@ -1,12 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
+using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Akka.Actor;
 using Akka.Configuration;
 using Akka.Util.Internal;
@@ -17,6 +22,7 @@ using LogReader.Configuration;
 using LogReader.Log4Net;
 using LogReader.Structure;
 using Microsoft.Win32;
+using Timer = System.Timers.Timer;
 
 namespace LogReader
 {
@@ -41,9 +47,7 @@ namespace LogReader
         public LogViewModel LogViewModel;
 
         #endregion
-
-        public bool resizing = false;
-
+        
         public MainWindow()
         {
             InitializeComponent();
@@ -159,7 +163,9 @@ namespace LogReader
         private void ReadLine(long startingByte, bool overrideUi = false)
         {
             LogViewModel.InitiateNewRead();
-            _readLineFromFileActor.Tell(new ReadLineFromFileActorMessages.ReadLineFromFileStartingAtByte(LogViewModel.LocateLogFileFromByteReference(startingByte), startingByte, overrideUi));
+            _readLineFromFileActor.Tell(new ReadLineFromFileActorMessages.ReadLineFromFileStartingAtByte(
+                LogViewModel.LocateLogFileFromByteReference(startingByte), LogViewModel.TranslateRelativeBytePosition(startingByte),
+                overrideUi));
         }
 
         private void BeginNewReadAtByteLocation(long startingByte,
@@ -168,12 +174,25 @@ namespace LogReader
             LogViewModel.InitiateNewRead();
             _findStartingByteActor.Tell(
                 new FindByteLocationActorMessages.FindByteLocationInFile(
-                    startingByte,
+                    LogViewModel.TranslateRelativeBytePosition(startingByte),
             ProgramConfig.LineFeedByte,
                     searchDirection,
                 LogViewModel.LocateLogFileFromByteReference(startingByte),
                 numberOfInstancesToFind,
                 overrideUI));
+        }
+
+        private void ContinueReadFromByteLocation(long startingByte,
+            FindByteLocationActorMessages.SearchDirection searchDirection, int numberOfInstancesToFind, bool overrideUI = false)
+        {
+            _findStartingByteActor.Tell(
+                new FindByteLocationActorMessages.FindByteLocationInFile(
+                    LogViewModel.TranslateRelativeBytePosition(startingByte),
+                    ProgramConfig.LineFeedByte,
+                    searchDirection,
+                    LogViewModel.LocateLogFileFromByteReference(startingByte),
+                    numberOfInstancesToFind,
+                    overrideUI));
         }
 
         #endregion
@@ -226,8 +245,6 @@ namespace LogReader
                 {
                     startingByte =
                         Math.Max(0, Math.Min(LogViewModel.TotalFileSizesInBytes, (long)(e.NewValue * 10)));
-
-                    FileLocationWindowLabel.Content = LogViewModel.LocateLogFileFromByteReference(startingByte);
                 }
                 else
                 {
@@ -238,45 +255,11 @@ namespace LogReader
             }
         }
 
-        private void ManualScrollBar_OnValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            ScrollValueLabel.Content = e.NewValue;
-        }
-
         #endregion
 
         private void MainWindow_OnLoaded(object sender, RoutedEventArgs e)
         {
             this.DataContext = LogViewModel = new LogViewModel();
-        }
-
-        private void Lines_OnLayoutUpdated(object sender, EventArgs e)
-        {
-            if (null == LogViewModel)
-            {
-                return;
-            }
-
-            if (resizing)
-            {
-                resizing = false;
-                return;
-            }
-
-            ScrollViewer sv = FindVisualChild<ScrollViewer>(Lines);
-
-            if (null == sv || !LogViewModel.ExpandingView)
-            {
-                return;
-            }
-
-            if (sv.ComputedVerticalScrollBarVisibility != Visibility.Visible)
-            {
-                return;
-            }
-
-            LogViewModel.ExpandingView = false;
-            sv.VerticalScrollBarVisibility = ScrollBarVisibility.Hidden;
         }
 
         private T FindVisualChild<T>(DependencyObject obj) where T: DependencyObject
@@ -301,26 +284,57 @@ namespace LogReader
 
         private void MainWindow_OnSizeChanged(object sender, SizeChangedEventArgs e)
         {
-            if (null == LogViewModel ||
-                null == Lines ||
-                LogViewModel.IsReading)
+            if (null == LogViewModel)
             {
                 return;
             }
 
-
-            ScrollViewer sv = FindVisualChild<ScrollViewer>(Lines);
-            if (null == sv)
+            if (LogViewModel.IsReading)
             {
                 return;
             }
 
-            resizing = true;
+            if (e.NewSize.Height <= e.PreviousSize.Height)
+            {
+                return;
+            }
+
             LogViewModel.ExpandingView = true;
-            sv.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
-            long startingByteForNewRead = LogViewModel.FirstLineStartingByte;
-            LogViewModel.ResetUserInterface();
-            BeginNewReadAtByteLocation(startingByteForNewRead, FindByteLocationActorMessages.SearchDirection.Backward, 1);
+            long startingByteForNewRead = LogViewModel.LastLineEndingByte;
+            ContinueReadFromByteLocation(startingByteForNewRead, FindByteLocationActorMessages.SearchDirection.Backward, 1);
+        }
+
+        void DataGrid_ScrollChanged(object sender, RoutedEventArgs e)
+        {
+            if (null == LogViewModel)
+            {
+                return;
+            }
+
+            var scrollViewer = FindVisualChild<ScrollViewer>((DependencyObject)sender);
+
+            if (null == scrollViewer)
+            {
+                return;
+            }
+
+            if (scrollViewer.ComputedVerticalScrollBarVisibility != Visibility.Visible)
+            {
+                return;
+            }
+
+            LogViewModel.CapScrollWindow();
+            scrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+        }
+
+        private void GoToLineCommand_OnCanExecute(object sender, CanExecuteRoutedEventArgs e)
+        {
+            e.CanExecute = true;
+        }
+
+        private void GoToLineCommand_Executed(object sender, ExecutedRoutedEventArgs e)
+        {
+
         }
     }
 }

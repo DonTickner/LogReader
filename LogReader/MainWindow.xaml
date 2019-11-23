@@ -4,31 +4,32 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:LogReader"
+        xmlns:commands="clr-namespace:LogReader.Commands"
         mc:Ignorable="d"
-        Title="MainWindow" Height="428.93" Width="1116.024" MinWidth="200" MinHeight="200"
+        Title="MainWindow" Height="425" Width="744" MinWidth="744" MinHeight="200"
         WindowStyle="ThreeDBorderWindow"
         Loaded="MainWindow_OnLoaded"
         SizeChanged="MainWindow_OnSizeChanged">
-    <Grid Name="LayoutGrid" ShowGridLines="False" Margin="0,0,2,0">
+    <Window.CommandBindings>
+        <CommandBinding Command="commands:UICommands.GoToLineCommand" CanExecute="GoToLineCommand_OnCanExecute" Executed="GoToLineCommand_Executed"/>
+    </Window.CommandBindings>
+    <Grid Name="LayoutGrid" ShowGridLines="False">
         <Grid.RowDefinitions>
             <RowDefinition MinHeight="100"/>
             <RowDefinition Height="Auto" MinHeight="43"/>
-            <RowDefinition Height="Auto" MinHeight="43"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="660*" MinWidth="75"/>
-            <ColumnDefinition Width="159*"/>
-            <ColumnDefinition Width="295*" MinWidth="75"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
         <Button Name="LoadFileButton" Content="Load File" VerticalAlignment="Bottom" Margin="10,0,0,10" Grid.Row="1" Height="20" HorizontalAlignment="Left" Width="63" Click="LoadFileButton_Click"/>
-        <TextBox Name="LineTextBox" Margin="10,10,10,43" Grid.Column="0" Grid.Row="0" Visibility="Hidden" Grid.RowSpan="2" Grid.ColumnSpan="2"/>
-        <ScrollBar Name="ManualScrollBar" Margin="0,10,10,43" Width="17" HorizontalAlignment="Right" Scroll="ManualScrollBar_OnScroll" ValueChanged="ManualScrollBar_OnValueChanged" Grid.Column="2" Grid.RowSpan="2" Maximum="{Binding CalculatedScrollableMaximum}"/>
+        <TextBox Name="LineTextBox" Margin="10,10,10,10" Grid.Column="0" Grid.Row="0" Visibility="Hidden" Grid.RowSpan="2"/>
+        <ScrollBar Name="ManualScrollBar" Scroll="ManualScrollBar_OnScroll" Maximum="{Binding CalculatedScrollableMaximum}" Grid.Column="1" Grid.Row="0" Margin="0,10,9,10"/>
         <Button Name="CountLinesInFileButton" Content="Count Lines in Current File" HorizontalAlignment="Left" Width="160" Margin="78,13,0,10" Grid.Row="1" Click="Button_Click_2"/>
-        <Label Name="ByteWindowLabel" Content="Label" Margin="10,7,0,10" Grid.Row="2" HorizontalContentAlignment="Left" HorizontalAlignment="Left" Width="315"/>
-        <Label Name="ScrollValueLabel"  Content="Label" Margin="0,7,10,10" Grid.Row="2" RenderTransformOrigin="1.382,0.582" HorizontalAlignment="Right" Width="200" HorizontalContentAlignment="Right" Grid.ColumnSpan="2"/>
-        <Label x:Name="FileLocationWindowLabel" Content="Label" Margin="10,7,0,10" Grid.Row="2" HorizontalContentAlignment="Left" HorizontalAlignment="Left" Width="267" Grid.Column="2"/>
-        <DataGrid x:Name="Lines" Margin="10,10,10,43" ItemsSource="{Binding LogLines}" AutoGenerateColumns="True" Grid.RowSpan="2" Grid.ColumnSpan="2" LayoutUpdated="Lines_OnLayoutUpdated" CanUserAddRows="false" Background="Transparent">
-            
+        <DataGrid x:Name="Lines" ItemsSource="{Binding LogLines}" AutoGenerateColumns="False" ScrollViewer.ScrollChanged="DataGrid_ScrollChanged" CanUserAddRows="false" Background="Transparent" SelectionMode="Single" Margin="10,10,0,10">
+            <DataGrid.Columns>
+                <DataGridTextColumn Binding="{Binding Line}"/>
+            </DataGrid.Columns>
         </DataGrid>
     </Grid>
 </Window>

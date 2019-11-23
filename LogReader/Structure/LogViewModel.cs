@@ -5,9 +5,6 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
-using Akka.Dispatch.SysMsg;
 using LogReader.Akka.Net.Actors;
 using LogReader.Annotations;
 using LogReader.Configuration;
@@ -16,9 +13,7 @@ namespace LogReader.Structure
 {
     public class LogViewModel: INotifyPropertyChanged
     {
-        private int _currentLineToUpdate = 0;
-
-        private readonly List<ByteWindow> _onScreenlogLines;
+        public int CurrentLineToUpdate = 0;
         
         private ObservableCollection<LogLine> _logLines = new ObservableCollection<LogLine>();
         public ObservableCollection<LogLine> LogLines
@@ -30,9 +25,11 @@ namespace LogReader.Structure
             }
         }
 
-        public long FirstLineStartingByte => _onScreenlogLines[0].StartingByte;
+        public long FirstLineStartingByte => _logLines[0].StartingByte;
 
-        public long FirstLineEndingByte => _onScreenlogLines[0].EndingByte;
+        public long FirstLineEndingByte => _logLines[0].EndingByte;
+
+        public long LastLineEndingByte => _logLines[^1].EndingByte;
 
         private List<Tuple<string, long>> _logFileLocations;
 
@@ -55,15 +52,32 @@ namespace LogReader.Structure
 
         public int TotalNumberOfLogFiles => _logFileLocations.Count;
 
-        public bool IsReading => _currentLineToUpdate <= LogLines.Count + 1;
+        public bool IsReading
+        {
+            get
+            {
+                return CurrentLineToUpdate <= LogLines.Count + 1;
+            }
+        }
 
-        public bool ExpandingView = true;
+        private bool _isExpanding = true;
+        public bool ExpandingView
+        {
+            get
+            {
+                return _isExpanding;
+            }
+            set
+            {
+                _isExpanding = value;
+                OnPropertyChanged(nameof(ExpandingView));
+            }
+        }
 
         public LogViewModel()
         {
             LogLines = new ObservableCollection<LogLine>();
 
-            _onScreenlogLines = new List<ByteWindow>();
             _logFileLines = new List<Tuple<string, int>>();
             _logFileLocations = new List<Tuple<string, long>>();
         }
@@ -74,40 +88,57 @@ namespace LogReader.Structure
         /// <param name="lineToAdd">The <see cref="string"/> to be added.</param>
         public void AddLine(ReadLineFromFileActor.ReturnedLine lineToAdd)
         {
-            ByteWindow newLine =
-                CreateNewByteWindow(lineToAdd.LineStartsAtByteLocation, lineToAdd.LineEndsAtByteLocation);
-
             if (!ExpandingView)
             {
-                int zeroBasedLogLineIndex = Math.Max(0, _currentLineToUpdate - 1);
+                int zeroBasedLogLineIndex = Math.Max(0, CurrentLineToUpdate - 1);
 
                 if (zeroBasedLogLineIndex < _logLines.Count)
                 {
                     _logLines[zeroBasedLogLineIndex] = CreateNewLogLine(lineToAdd);
-                    _onScreenlogLines[zeroBasedLogLineIndex] = newLine;
                 }
             }
             else
             { 
                 _logLines.Add(CreateNewLogLine(lineToAdd));
-                _onScreenlogLines.Add(newLine);
             }
 
-            _currentLineToUpdate++;
+            CurrentLineToUpdate++;
+            OnPropertyChanged(nameof(CurrentLineToUpdate));
+            OnPropertyChanged(nameof(IsReading)); 
         }
 
         private LogLine CreateNewLogLine(ReadLineFromFileActor.ReturnedLine line)
         {
             return new LogLine
             {
-                Line = line.Line
+                Line = line.Line,
+                StartingByte = CreateRelativeByteReference(line.LineStartsAtByteLocation, line.FilePath),
+                EndingByte = CreateRelativeByteReference(line.LineEndsAtByteLocation, line.FilePath),
+                File = line.FilePath
             };
+        }
+
+        public long CreateRelativeByteReference(long byteLocationWithinFile, string file)
+        {
+            long relativeByteReference = byteLocationWithinFile;
+
+            foreach (Tuple<string, long> logFileLocation in _logFileLocations)
+            {
+                if (logFileLocation.Item1 == file)
+                {
+                    break;
+                }
+
+                relativeByteReference += logFileLocation.Item2;
+            }
+
+            return relativeByteReference;
         }
 
         public void SetLogFileLocations(List<Tuple<string, long>> logFileLocations)
         {
             _logFileLocations = logFileLocations;
-            CountLinesInFiles();
+            // CountLinesInFiles();
             OnPropertyChanged(nameof(CalculatedScrollableMaximum));
         }
 
@@ -128,6 +159,26 @@ namespace LogReader.Structure
             }
 
             return filePath;
+        }
+
+        /// <summary>
+        /// Translates a byte position from within the total byte field into a specific file location's byte.
+        /// </summary>
+        /// <param name="byteLocation">The starting byte location.</param>
+        public long TranslateRelativeBytePosition(long byteLocation)
+        {
+            long relativeByte = byteLocation;
+            long byteOffset = 0;
+            foreach (Tuple<string, long> logFileLocation in _logFileLocations)
+            {
+                if (byteLocation > (logFileLocation.Item2 + byteOffset))
+                {
+                    relativeByte -= logFileLocation.Item2;
+                    byteOffset += logFileLocation.Item2;
+                }
+            }
+
+            return relativeByte;
         }
 
         /// <summary>
@@ -175,7 +226,9 @@ namespace LogReader.Structure
 
         public void InitiateNewRead()
         {
-            _currentLineToUpdate = 1;
+            CurrentLineToUpdate = 1;
+            OnPropertyChanged(nameof(CurrentLineToUpdate));
+            OnPropertyChanged(nameof(IsReading));
         }
 
         private ByteWindow CreateNewByteWindow(long start, long end)
@@ -187,18 +240,23 @@ namespace LogReader.Structure
             };
         }
 
-        public void ResetUserInterface()
-        {
-            InitiateNewRead();
-            _logLines.Clear();
-        }
-
         public event PropertyChangedEventHandler PropertyChanged;
 
         [NotifyPropertyChangedInvocator]
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        public void CapScrollWindow()
+        {
+            ExpandingView = false;
+            if (_logLines.Count <= 0)
+            {
+                return;
+            }
+
+            _logLines.RemoveAt(_logLines.Count - 1);
         }
     }
 }
