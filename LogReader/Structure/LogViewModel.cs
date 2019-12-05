@@ -88,6 +88,11 @@ namespace LogReader.Structure
         /// <param name="lineToAdd">The <see cref="string"/> to be added.</param>
         public void AddLine(ReadLineFromFileActor.ReturnedLine lineToAdd)
         {
+            if (null == lineToAdd)
+            {
+                return;
+            }
+
             if (!ExpandingView)
             {
                 int zeroBasedLogLineIndex = Math.Max(0, CurrentLineToUpdate - 1);
@@ -144,11 +149,13 @@ namespace LogReader.Structure
 
         public string LocateLogFileFromByteReference(long byteLocation)
         {
+            long clampedByteLocation = ClampByteLocation(byteLocation);
+
             string filePath = string.Empty;
             long byteOffset = 0;
             foreach (Tuple<string, long> logFileLocation in _logFileLocations)
             {
-                if (byteLocation > (logFileLocation.Item2 + byteOffset))
+                if (clampedByteLocation >= (logFileLocation.Item2 + byteOffset))
                 {
                     byteOffset += logFileLocation.Item2;
                     continue;
@@ -162,20 +169,29 @@ namespace LogReader.Structure
         }
 
         /// <summary>
-        /// Translates a byte position from within the total byte field into a specific file location's byte.
+        /// Translates a zero-based byte position from within the total byte field into a zero-based specific file location's byte.
         /// </summary>
         /// <param name="byteLocation">The starting byte location.</param>
         public long TranslateRelativeBytePosition(long byteLocation)
         {
-            long relativeByte = byteLocation;
+            long clampedByteLocation = ClampByteLocation(byteLocation);
+
+            long relativeByte = clampedByteLocation;
             long byteOffset = 0;
             foreach (Tuple<string, long> logFileLocation in _logFileLocations)
             {
-                if (byteLocation > (logFileLocation.Item2 + byteOffset))
+                if (_logFileLocations.IndexOf(logFileLocation) == _logFileLocations.Count - 1)
                 {
-                    relativeByte -= logFileLocation.Item2;
-                    byteOffset += logFileLocation.Item2;
+                    break;
                 }
+
+                if (clampedByteLocation < (logFileLocation.Item2 + byteOffset))
+                {
+                    continue;
+                }
+
+                relativeByte -= logFileLocation.Item2;
+                byteOffset += logFileLocation.Item2;
             }
 
             return relativeByte;
@@ -257,6 +273,13 @@ namespace LogReader.Structure
             }
 
             _logLines.RemoveAt(_logLines.Count - 1);
+        }
+
+        private long ClampByteLocation(long byteLocation)
+        {
+            long totalBytes = _logFileLocations.Sum(a => a.Item2) - 1;
+            long clampedByteLocation = Math.Max(0, Math.Min(totalBytes, byteLocation));
+            return clampedByteLocation;
         }
     }
 }

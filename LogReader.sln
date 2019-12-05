@@ -9,7 +9,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LogForwardService", "LogFor
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Log4Net.Extensions", "Log4Net.Extensions\Log4Net.Extensions.csproj", "{CB1D3423-CE1F-4918-BA29-4453377F030E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WPF.BespokeControls", "WPF.BespokeControls\WPF.BespokeControls.csproj", "{8A46C613-0BFF-4611-A2E5-91F97545AF20}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WPF.BespokeControls", "WPF.BespokeControls\WPF.BespokeControls.csproj", "{8A46C613-0BFF-4611-A2E5-91F97545AF20}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LogReader.UnitTests", "LogReader.UnitTests\LogReader.UnitTests.csproj", "{1076ABC7-E10C-4633-9BD9-1FAF89522DA5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +35,10 @@ Global
 		{8A46C613-0BFF-4611-A2E5-91F97545AF20}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8A46C613-0BFF-4611-A2E5-91F97545AF20}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8A46C613-0BFF-4611-A2E5-91F97545AF20}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1076ABC7-E10C-4633-9BD9-1FAF89522DA5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1076ABC7-E10C-4633-9BD9-1FAF89522DA5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1076ABC7-E10C-4633-9BD9-1FAF89522DA5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1076ABC7-E10C-4633-9BD9-1FAF89522DA5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
