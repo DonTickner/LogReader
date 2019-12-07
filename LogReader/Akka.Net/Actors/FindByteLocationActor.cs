@@ -139,7 +139,10 @@ namespace LogReader.Akka.Net.Actors
                        && numberFound < message.InstanceNumberToFind)
                 {
                     fileStream.Seek(Convert.ToInt32(chunkStartingAtByte), SeekOrigin.Begin);
-                    fileStream.Read(buffer, 0, ProgramConfig.ChunkSize);
+
+                    long amountToRead = Math.Min(ProgramConfig.ChunkSize, fileSizeInBytes - chunkStartingAtByte);
+                    fileStream.Read(buffer, 0, (int)amountToRead);
+                    
                     long byteLocation = SearchForByteInChunk(buffer, message.ByteToFind, searchDirection, startingByte);
 
                     if (byteLocation >= 0)
@@ -155,7 +158,7 @@ namespace LogReader.Akka.Net.Actors
                     }
                     startingByte = Math.Max(Math.Min(byteLocation + searchDirection, fileSizeInBytes), 0);
 
-                    chunkStartingAtByte = Math.Max(chunkStartingAtByte + (ProgramConfig.ChunkSize * searchDirection), 0);
+                    chunkStartingAtByte = Math.Max(amountToRead + (ProgramConfig.ChunkSize * searchDirection), 0);
                     if (startingByte == 0 || startingByte == fileSizeInBytes)
                     {
                         return 0;

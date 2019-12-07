@@ -364,5 +364,140 @@ namespace LogReader.UnitTests
             string expectedLogFile = "log5";
             Assert.AreEqual(expectedLogFile, logFileFromByteReference);
         }
+
+        [Test]
+        public void WhenCreatingRelativeByteReference_MidRangeByte_ReturnCorrectFile()
+        {
+            // Setup test objects
+            LogViewModel testLogViewModel = new LogViewModel();
+
+            List<Tuple<string, long>> testLogFileLocations = new List<Tuple<string, long>>
+            {
+                new Tuple<string, long>("log1", 100),
+                new Tuple<string, long>("log2", 220),
+                new Tuple<string, long>("log3", 440),
+                new Tuple<string, long>("log4", 660),
+                new Tuple<string, long>("log5", 880)
+            };
+            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+
+            long byteWithinFile = 5;
+            string logFileName = "log3";
+
+            // Perform test
+            long relativeByteReference = testLogViewModel.CreateRelativeByteReference(byteWithinFile, logFileName);
+
+            // Check test result
+            long expectedByteReference = 325;
+            Assert.AreEqual(expectedByteReference, relativeByteReference);
+        }
+
+        [Test]
+        public void WhenCreatingRelativeByteReference_ByteAtEndOfFile_ReturnCorrectFile()
+        {
+            // Setup test objects
+            LogViewModel testLogViewModel = new LogViewModel();
+
+            List<Tuple<string, long>> testLogFileLocations = new List<Tuple<string, long>>
+            {
+                new Tuple<string, long>("log1", 100),
+                new Tuple<string, long>("log2", 220),
+                new Tuple<string, long>("log3", 440),
+                new Tuple<string, long>("log4", 660),
+                new Tuple<string, long>("log5", 880)
+            };
+            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+
+            long byteWithinFile = 220;
+            string logFileName = "log2";
+
+            // Perform test
+            long relativeByteReference = testLogViewModel.CreateRelativeByteReference(byteWithinFile, logFileName);
+
+            // Check test result
+            long expectedByteReference = 320;
+            Assert.AreEqual(expectedByteReference, relativeByteReference);
+        }
+
+        [Test]
+        public void WhenCreatingRelativeByteReference_ByteAtStartOfFile_ReturnCorrectFile()
+        {
+            // Setup test objects
+            LogViewModel testLogViewModel = new LogViewModel();
+
+            List<Tuple<string, long>> testLogFileLocations = new List<Tuple<string, long>>
+            {
+                new Tuple<string, long>("log1", 100),
+                new Tuple<string, long>("log2", 220),
+                new Tuple<string, long>("log3", 440),
+                new Tuple<string, long>("log4", 660),
+                new Tuple<string, long>("log5", 880)
+            };
+            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+
+            long byteWithinFile = 0;
+            string logFileName = "log4";
+
+            // Perform test
+            long relativeByteReference = testLogViewModel.CreateRelativeByteReference(byteWithinFile, logFileName);
+
+            // Check test result
+            long expectedByteReference = 760;
+            Assert.AreEqual(expectedByteReference, relativeByteReference);
+        }
+
+        [Test]
+        public void WhenCreatingRelativeByteReference_ByteAboveTotalBytesOfFile_ReturnCorrectFile()
+        {
+            // Setup test objects
+            LogViewModel testLogViewModel = new LogViewModel();
+
+            List<Tuple<string, long>> testLogFileLocations = new List<Tuple<string, long>>
+            {
+                new Tuple<string, long>("log1", 100),
+                new Tuple<string, long>("log2", 220),
+                new Tuple<string, long>("log3", 440),
+                new Tuple<string, long>("log4", 660),
+                new Tuple<string, long>("log5", 880)
+            };
+            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+
+            long byteWithinFile = 455;
+            string logFileName = "log3";
+
+            // Perform test
+            long relativeByteReference = testLogViewModel.CreateRelativeByteReference(byteWithinFile, logFileName);
+
+            // Check test result
+            long expectedByteReference = 760;
+            Assert.AreEqual(expectedByteReference, relativeByteReference);
+        }
+
+        [Test]
+        public void WhenCreatingRelativeByteReference_ByteBeneathZero_ReturnCorrectFile()
+        {
+            // Setup test objects
+            LogViewModel testLogViewModel = new LogViewModel();
+
+            List<Tuple<string, long>> testLogFileLocations = new List<Tuple<string, long>>
+            {
+                new Tuple<string, long>("log1", 100),
+                new Tuple<string, long>("log2", 220),
+                new Tuple<string, long>("log3", 440),
+                new Tuple<string, long>("log4", 660),
+                new Tuple<string, long>("log5", 880)
+            };
+            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+
+            long byteWithinFile = -455;
+            string logFileName = "log3";
+
+            // Perform test
+            long relativeByteReference = testLogViewModel.CreateRelativeByteReference(byteWithinFile, logFileName);
+
+            // Check test result
+            long expectedByteReference = 320;
+            Assert.AreEqual(expectedByteReference, relativeByteReference);
+        }
     }
 }

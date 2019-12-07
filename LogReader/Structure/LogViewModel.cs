@@ -123,9 +123,15 @@ namespace LogReader.Structure
             };
         }
 
+        /// <summary>
+        /// Creates a zero-based relative byte reference within the total byte window based on a position within a current file.
+        /// </summary>
+        /// <param name="byteLocationWithinFile">The zero-based byte location within the log file.</param>
+        /// <param name="file">The log file that the byte is within.</param>
         public long CreateRelativeByteReference(long byteLocationWithinFile, string file)
         {
             long relativeByteReference = byteLocationWithinFile;
+            relativeByteReference = Math.Max(0, Math.Min(_logFileLocations.FirstOrDefault(t => t.Item1 == file)?.Item2 ?? 0, relativeByteReference));
 
             foreach (Tuple<string, long> logFileLocation in _logFileLocations)
             {
