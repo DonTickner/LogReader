@@ -20,6 +20,21 @@ namespace WPF.BespokeControls.TextBox
     /// </summary>
     public partial class NumericalTextBox : System.Windows.Controls.TextBox
     {
+        /// <summary>
+        /// Returns the text value of the <see cref="NumericalTextBox"/> as a long.
+        /// </summary>
+        public long NumericalValue
+        {
+            get
+            {
+                if(long.TryParse(Text, out long result))
+                {
+                    return result;
+                }
+                return 0;
+            }
+        }
+
         public NumericalTextBox()
         {
             InitializeComponent();
@@ -41,7 +56,7 @@ namespace WPF.BespokeControls.TextBox
         /// </summary>
         private void OnPreviewTextInput(object sender, TextCompositionEventArgs e)
         {
-            e.Handled = int.TryParse(e.Text, out int result);
+            e.Handled = !int.TryParse(e.Text, out int result);
         }
     }
 }

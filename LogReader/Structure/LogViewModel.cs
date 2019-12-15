@@ -25,15 +25,21 @@ namespace LogReader.Structure
             }
         }
 
-        public long FirstLineStartingByte => _logLines[0].StartingByte;
+        public long FirstLineStartingByte => _logLines[0]?.StartingByte ?? 0;
 
-        public long FirstLineEndingByte => _logLines[0].EndingByte;
+        public long FirstLineEndingByte => _logLines[0]?.EndingByte ?? 0;
 
-        public long LastLineEndingByte => _logLines[^1].EndingByte;
+        public long LastLineEndingByte => _logLines[^1]?.EndingByte ?? 0;
 
         private List<Tuple<string, long>> _logFileLocations;
 
         private List<Tuple<string, int>> _logFileLines;
+
+        public List<string> LogFiles { get
+            {
+                return _logFileLocations.Select(l => l.Item1).ToList();
+            }
+        }
 
         public long TotalFileSizesInBytes
         {
@@ -151,6 +157,7 @@ namespace LogReader.Structure
             _logFileLocations = logFileLocations;
             // CountLinesInFiles();
             OnPropertyChanged(nameof(CalculatedScrollableMaximum));
+            OnPropertyChanged(nameof(LogFiles));
         }
 
         public string LocateLogFileFromByteReference(long byteLocation)

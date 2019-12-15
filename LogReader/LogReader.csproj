@@ -12,4 +12,7 @@
     <ProjectReference Include="..\Log4Net.Extensions\Log4Net.Extensions.csproj" />
     <ProjectReference Include="..\WPF.BespokeControls\WPF.BespokeControls.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Forms\" />
+  </ItemGroup>
 </Project>

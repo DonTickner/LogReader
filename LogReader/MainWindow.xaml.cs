@@ -1,28 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Threading;
 using Akka.Actor;
 using Akka.Configuration;
-using Akka.Util.Internal;
 using Log4Net.Extensions.Configuration.Implementation;
 using Log4Net.Extensions.Configuration.Implementation.ConfigObjects;
 using LogReader.Akka.Net.Actors;
 using LogReader.Configuration;
 using LogReader.Log4Net;
 using LogReader.Structure;
-using Microsoft.Win32;
-using Timer = System.Timers.Timer;
 
 namespace LogReader
 {
@@ -38,6 +30,7 @@ namespace LogReader
         private IActorRef _findStartingByteActor;
         private IActorRef _readLineFromFileActor;
         private IActorRef _updateDataSourceActor;
+        private IActorRef _updateUIActor;
 
         #endregion
 
@@ -92,8 +85,10 @@ namespace LogReader
             var config = ConfigurationFactory.ParseString(@"akka.actor.default-dispatcher.shutdown { timeout = 0 }");
             _akkaActorSystem = ActorSystem.Create("MyActorSystem", config);
 
+            Props updateUIActorProps = Props.Create(() => new UpdateUIActor(gotoProgressButton.PerformStep)).WithDispatcher("akka.actor.synchronized-dispatcher");
+            _updateUIActor = _akkaActorSystem.ActorOf(updateUIActorProps, $"updateUI_{Guid.NewGuid()}");
+
             Props updateDataSourceActorProps = Props.Create(() => new UpdateDataSourceActor(this)).WithDispatcher("akka.actor.synchronized-dispatcher");
-            // Props updateDataSourceActorProps = Props.Create(() => new UpdateDataSourceActor(this));
             _updateDataSourceActor = _akkaActorSystem.ActorOf(updateDataSourceActorProps, $"updateDataSource_{Guid.NewGuid()}");
 
             Props readLineFromFileActorProps = Props.Create(() => new ReadLineFromFileActor(_updateDataSourceActor));
@@ -173,7 +168,7 @@ namespace LogReader
         {
             LogViewModel.InitiateNewRead();
             _findStartingByteActor.Tell(
-                new FindByteLocationActorMessages.FindByteLocationInFile(
+                new FindByteLocationActorMessages.FindNumeredInstanceOfByteLocationInFile(
                     LogViewModel.TranslateRelativeBytePosition(startingByte),
             ProgramConfig.LineFeedByte,
                     searchDirection,
@@ -182,11 +177,30 @@ namespace LogReader
                 overrideUI));
         }
 
+        private void BeginReadAtNewSpecificByteIndexLocation(FindByteLocationActorMessages.SearchDirection searchDirection, long numberOfInstancesToFind, string file, bool overrideUI = false)
+        {
+            BeginReadAtNewSpecificByteIndexLocationAndUpdate(searchDirection, numberOfInstancesToFind, file, null, overrideUI);
+        }
+
+        private void BeginReadAtNewSpecificByteIndexLocationAndUpdate(FindByteLocationActorMessages.SearchDirection searchDirection, long numberOfInstancesToFind, string file, IActorRef updateUIActor, bool overrideUI)
+        {
+            LogViewModel.InitiateNewRead();
+            _findStartingByteActor.Tell(
+                new FindByteLocationActorMessages.FindNumeredInstanceOfByteLocationInFileAndUpdateOnProgress(
+                0,
+                ProgramConfig.LineFeedByte,
+                searchDirection,
+                file,
+                numberOfInstancesToFind,
+                overrideUI,
+                updateUIActor));
+        }
+
         private void ContinueReadFromByteLocation(long startingByte,
             FindByteLocationActorMessages.SearchDirection searchDirection, int numberOfInstancesToFind, bool overrideUI = false)
         {
             _findStartingByteActor.Tell(
-                new FindByteLocationActorMessages.FindByteLocationInFile(
+                new FindByteLocationActorMessages.FindNumeredInstanceOfByteLocationInFile(
                     LogViewModel.TranslateRelativeBytePosition(startingByte),
                     ProgramConfig.LineFeedByte,
                     searchDirection,
@@ -212,8 +226,6 @@ namespace LogReader
             LoadLogFiles();
 
             LineTextBox.Text = string.Empty;
-
-            // ManualScrollBar.Maximum = LogViewModel.TotalFileSizesInBytes / 10;
             
             ManualScrollBar.IsEnabled = true;
 
@@ -332,9 +344,37 @@ namespace LogReader
             e.CanExecute = true;
         }
 
-        private void GoToLineCommand_Executed(object sender, ExecutedRoutedEventArgs e)
+        private void CommandBinding_Executed(object sender, ExecutedRoutedEventArgs e)
         {
+            Visibility visibility = GotoPopup.Visibility == Visibility.Collapsed ? Visibility.Visible : Visibility.Collapsed;
+            GotoPopup.Visibility = visibility;
 
+            if (visibility != Visibility.Collapsed)
+            {
+                return;
+            }
+
+            gotoProgressButton.ProgressBarVisibility = visibility;
+            goToNumberFileComboBox.SelectedItem = null;
+            goToNumberTextBox.Text = string.Empty;
+        }
+
+        private void goToNumberButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (null == goToNumberFileComboBox.SelectionBoxItem)
+            {
+                return;
+            }
+
+            gotoProgressButton.IsEnabled = false;
+
+            gotoProgressButton.ProgressBarVisibility = Visibility.Visible;
+            gotoProgressButton.CurrentValue = 0;
+            gotoProgressButton.MinValue = 0;
+            gotoProgressButton.MaxValue = goToNumberTextBox.NumericalValue;
+            gotoProgressButton.StepValue = 1;
+            
+            BeginReadAtNewSpecificByteIndexLocationAndUpdate(FindByteLocationActorMessages.SearchDirection.Forward, Math.Max(0, goToNumberTextBox.NumericalValue - 1), goToNumberFileComboBox.SelectedItem as string, _updateUIActor, true);
         }
     }
 }

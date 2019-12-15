@@ -55,7 +55,11 @@ namespace LogReader.Akka.Net.Actors
         {
             if (message.OverrideUI)
             {
-                _dataSourceToUpdate.ManualScrollBar.Value = message.ReturnedLine.LineStartsAtByteLocation / 10;
+                long relativeStartReference =
+                    _dataSourceToUpdate.LogViewModel.CreateRelativeByteReference(message.ReturnedLine.LineStartsAtByteLocation,
+                        message.ReturnedLine.FilePath);
+
+                _dataSourceToUpdate.ManualScrollBar.Value = relativeStartReference / 10;
             }
 
             _dataSourceToUpdate.LogViewModel.AddLine(message.ReturnedLine);
