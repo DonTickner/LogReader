@@ -18,5 +18,10 @@ namespace LogReader.Commands
             "Go To Line", "Go To Line", typeof(UICommands), new InputGestureCollection { new KeyGesture(Key.G, ModifierKeys.Control )
             }
         );
+
+        public static readonly RoutedUICommand OpenLog4NetConfigCommand = new RoutedUICommand(
+            "Open Log4Net Config", "Open Log4Net Config", typeof(UICommands), new InputGestureCollection { new KeyGesture(Key.O, ModifierKeys.Control )
+            }
+        );
     }
 }

@@ -215,25 +215,6 @@ namespace LogReader
 
         #region Events
 
-        private void LoadFileButton_Click(object sender, RoutedEventArgs e)
-        {
-            SelectTextFileToOpen();
-            if (null == _log4NetConfig)
-            {
-                return;
-            }
-
-            LoadLogFiles();
-
-            LineTextBox.Text = string.Empty;
-            
-            ManualScrollBar.IsEnabled = true;
-
-            ManualScrollBar.Value = ManualScrollBar.Minimum;
-
-            ReadLine(0);
-        }
-
         private void ManualScrollBar_OnScroll(object sender, ScrollEventArgs e)
         {
             if (e.ScrollEventType == ScrollEventType.EndScroll
@@ -341,27 +322,34 @@ namespace LogReader
 
         private void GoToLineCommand_OnCanExecute(object sender, CanExecuteRoutedEventArgs e)
         {
-            e.CanExecute = true;
+            e.CanExecute = LogViewModel?.HasLoaded ?? false;
         }
 
-        private void CommandBinding_Executed(object sender, ExecutedRoutedEventArgs e)
+        private void GoToLineCommand_Executed(object sender, ExecutedRoutedEventArgs e)
         {
             Visibility visibility = GotoPopup.Visibility == Visibility.Collapsed ? Visibility.Visible : Visibility.Collapsed;
             GotoPopup.Visibility = visibility;
 
-            if (visibility != Visibility.Collapsed)
+            switch (visibility)
             {
-                return;
+                case Visibility.Visible:
+                {
+                    goToNumberTextBox.Focus();
+                    break;
+                }
+                case Visibility.Collapsed:
+                {
+                    gotoProgressButton.ProgressBarVisibility = visibility;
+                    goToNumberFileComboBox.SelectedItem = null;
+                    goToNumberTextBox.Text = string.Empty;
+                    break;
+                }
             }
-
-            gotoProgressButton.ProgressBarVisibility = visibility;
-            goToNumberFileComboBox.SelectedItem = null;
-            goToNumberTextBox.Text = string.Empty;
         }
 
         private void goToNumberButton_Click(object sender, RoutedEventArgs e)
         {
-            if (null == goToNumberFileComboBox.SelectionBoxItem)
+            if (null == goToNumberFileComboBox.SelectedItem)
             {
                 return;
             }
@@ -371,10 +359,34 @@ namespace LogReader
             gotoProgressButton.ProgressBarVisibility = Visibility.Visible;
             gotoProgressButton.CurrentValue = 0;
             gotoProgressButton.MinValue = 0;
-            gotoProgressButton.MaxValue = goToNumberTextBox.NumericalValue;
+            gotoProgressButton.MaxValue = Math.Max(goToNumberTextBox.NumericalValue, 1);
             gotoProgressButton.StepValue = 1;
             
             BeginReadAtNewSpecificByteIndexLocationAndUpdate(FindByteLocationActorMessages.SearchDirection.Forward, Math.Max(0, goToNumberTextBox.NumericalValue - 1), goToNumberFileComboBox.SelectedItem as string, _updateUIActor, true);
+        }
+
+        private void OpenLog4NetConfig_OnCanExecute(object sender, CanExecuteRoutedEventArgs e)
+        {
+            e.CanExecute = true;
+        }
+
+        private void OpenLog4NetConfig_OnExecuted(object sender, ExecutedRoutedEventArgs e)
+        {
+            SelectTextFileToOpen();
+            if (null == _log4NetConfig)
+            {
+                return;
+            }
+
+            LoadLogFiles();
+
+            LineTextBox.Text = string.Empty;
+
+            ManualScrollBar.IsEnabled = true;
+
+            ManualScrollBar.Value = ManualScrollBar.Minimum;
+
+            ReadLine(0);
         }
     }
 }

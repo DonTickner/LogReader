@@ -25,11 +25,11 @@ namespace LogReader.Structure
             }
         }
 
-        public long FirstLineStartingByte => _logLines[0]?.StartingByte ?? 0;
+        public long FirstLineStartingByte => _logLines.Any() ? _logLines[0].StartingByte : 0;
 
-        public long FirstLineEndingByte => _logLines[0]?.EndingByte ?? 0;
+        public long FirstLineEndingByte => _logLines.Any() ? _logLines[0].EndingByte : 0;
 
-        public long LastLineEndingByte => _logLines[^1]?.EndingByte ?? 0;
+        public long LastLineEndingByte => _logLines.Any() ? _logLines[^1].EndingByte : 0;
 
         private List<Tuple<string, long>> _logFileLocations;
 
@@ -67,6 +67,7 @@ namespace LogReader.Structure
         }
 
         private bool _isExpanding = true;
+
         public bool ExpandingView
         {
             get
@@ -79,6 +80,8 @@ namespace LogReader.Structure
                 OnPropertyChanged(nameof(ExpandingView));
             }
         }
+
+        public bool HasLoaded => _logLines.Any();
 
         public LogViewModel()
         {
