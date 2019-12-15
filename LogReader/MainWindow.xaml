@@ -20,22 +20,26 @@
     <Grid x:Name="LayoutGrid" ShowGridLines="False">
         <Grid.RowDefinitions>
             <RowDefinition Height="22" MinHeight="22"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition MinHeight="100"/>
             <RowDefinition Height="10" MinHeight="10"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="10" MinWidth="10"/>
+            <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
-        <TextBox x:Name="LineTextBox" Margin="10,10,10,10" Grid.Column="1" Grid.Row="1" Visibility="Hidden" Grid.RowSpan="2"/>
-        <ScrollBar x:Name="ManualScrollBar" Scroll="ManualScrollBar_OnScroll" Maximum="{Binding CalculatedScrollableMaximum}" Grid.Column="2" Grid.Row="1" Margin="0,0,10,0"/>
-        <DataGrid x:Name="Lines" ItemsSource="{Binding LogLines}" AutoGenerateColumns="False" ScrollViewer.ScrollChanged="DataGrid_ScrollChanged" CanUserAddRows="false" Background="Transparent" SelectionMode="Single" Grid.Column="1" Grid.Row="1">
+        <TextBox x:Name="LineTextBox" Margin="10,10,10,10" Grid.Column="1" Grid.ColumnSpan="2" Grid.Row="2" Visibility="Hidden" Grid.RowSpan="2"/>
+        <ScrollBar x:Name="ManualScrollBar" Scroll="ManualScrollBar_OnScroll" Maximum="{Binding CalculatedScrollableMaximum}" Grid.Column="3" Grid.Row="2" Margin="0,0,10,0"/>
+        <DataGrid x:Name="Lines" ItemsSource="{Binding LogLines}" AutoGenerateColumns="False" ScrollViewer.ScrollChanged="DataGrid_ScrollChanged" CanUserAddRows="false" Background="Transparent" SelectionMode="Single" Grid.Column="1" Grid.Row="2" Grid.ColumnSpan="2">
             <DataGrid.Columns>
                 <DataGridTextColumn Binding="{Binding Line}"/>
             </DataGrid.Columns>
         </DataGrid>
-        <Grid Visibility="Collapsed" x:Name="GotoPopup" Width="Auto" HorizontalAlignment="Left" VerticalAlignment="Bottom" Grid.Row="1" Grid.Column="1">
+        <TextBlock x:Name="CurrentFileTextBlock" Text="Current File: " Grid.Column="1" Grid.Row="1" Width="Auto" Margin="0, 0, 0, 0" VerticalAlignment="Center" Visibility="Collapsed"/>
+        <ComboBox x:Name="CurrentFileComboBox" Grid.Column="2" Grid.Row="1" Width="Auto" Margin="0, 0, 0, 0" ItemsSource="{Binding LogFiles}" Visibility="Collapsed" SelectedItem="{Binding CurrentLogFile}" SelectionChanged="CurrentFileComboBox_OnSelected"/>
+        <Grid Visibility="Collapsed" x:Name="GotoPopup" Width="Auto" HorizontalAlignment="Left" VerticalAlignment="Bottom" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2">
             <Grid.Resources >
                 <Style TargetType="{x:Type Border}" >
                     <Setter Property="Padding" Value="5,5,5,5" />
@@ -54,7 +58,7 @@
                     <TextBlock x:Name="goToTextLabel" Text="Go To Line: " Grid.Column="0" TextAlignment="Center" VerticalAlignment="Center" Margin="5,0,5,0"/>
                     <TextBox:NumericalTextBox x:Name="goToNumberTextBox" Grid.Column="1" HorizontalAlignment="Center" Text="0" TextAlignment="Right" Width="100" Margin="5, 0, 5, 0"/>
                     <TextBlock x:Name="inTextLabel" Text="In" Grid.Column="2" Width="Auto" TextAlignment="Center" VerticalAlignment="Center" Margin="5, 0, 5, 0"/>
-                    <ComboBox x:Name="goToNumberFileComboBox" Grid.Column="3" Width="200" Margin="5, 0, 5, 0" ItemsSource="{Binding LogFiles}" HorizontalContentAlignment="Left"/>
+                    <ComboBox x:Name="goToNumberFileComboBox" Grid.Column="3" Width="200" Margin="5, 0, 5, 0" ItemsSource="{Binding LogFiles}" HorizontalContentAlignment="Left" SelectedItem="{Binding CurrentLogFile}"/>
                     <button:ProgressButton Name="gotoProgressButton" Grid.Column="4" ProgressBackground="Green" ProgressOpacity="0.25" Text="Go" ProgressBarVisibility="Hidden" Click="goToNumberButton_Click" TextAlignment="Center" Width="100" Margin="5, 0, 5, 0"/>
                 </Grid>
             </Border>

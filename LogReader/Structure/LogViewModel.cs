@@ -14,7 +14,9 @@ namespace LogReader.Structure
     public class LogViewModel: INotifyPropertyChanged
     {
         public int CurrentLineToUpdate = 0;
-        
+
+        public string CurrentLogFile { get; set; }
+
         private ObservableCollection<LogLine> _logLines = new ObservableCollection<LogLine>();
         public ObservableCollection<LogLine> LogLines
         {
@@ -109,16 +111,19 @@ namespace LogReader.Structure
                 if (zeroBasedLogLineIndex < _logLines.Count)
                 {
                     _logLines[zeroBasedLogLineIndex] = CreateNewLogLine(lineToAdd);
+                    CurrentLogFile = lineToAdd.FilePath;
                 }
             }
             else
             { 
                 _logLines.Add(CreateNewLogLine(lineToAdd));
+                CurrentLogFile = lineToAdd.FilePath;
             }
 
             CurrentLineToUpdate++;
             OnPropertyChanged(nameof(CurrentLineToUpdate));
-            OnPropertyChanged(nameof(IsReading)); 
+            OnPropertyChanged(nameof(IsReading));
+            OnPropertyChanged(nameof(CurrentLogFile));
         }
 
         private LogLine CreateNewLogLine(ReadLineFromFileActor.ReturnedLine line)

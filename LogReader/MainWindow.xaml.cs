@@ -384,9 +384,19 @@ namespace LogReader
 
             ManualScrollBar.IsEnabled = true;
 
+            CurrentFileComboBox.Visibility = Visibility.Visible;
+            CurrentFileTextBlock.Visibility = Visibility.Visible;
+
             ManualScrollBar.Value = ManualScrollBar.Minimum;
 
             ReadLine(0);
+        }
+
+        private void CurrentFileComboBox_OnSelected(object sender, RoutedEventArgs e)
+        {
+            long fileRelativeStartingByte =
+                LogViewModel.CreateRelativeByteReference(0, CurrentFileComboBox.SelectedItem as string);
+            BeginNewReadAtByteLocation(fileRelativeStartingByte, FindByteLocationActorMessages.SearchDirection.Backward, 1, true);
         }
     }
 }

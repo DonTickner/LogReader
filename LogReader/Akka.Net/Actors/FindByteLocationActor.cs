@@ -232,8 +232,9 @@ namespace LogReader.Akka.Net.Actors
         {
             int loopEnd = searchDirection > 0 ? bytesToSearch.Length : 0;
             int loopIncrement = 1 * searchDirection;
+            int safeStartingPosition = (int)Math.Min(Math.Max(0, startingPosition), bytesToSearch.Length - 1);
 
-            for (long i = startingPosition; i != loopEnd; i += loopIncrement)
+            for (long i = safeStartingPosition; i != loopEnd; i += loopIncrement)
             {
                 if (bytesToSearch[i] == byteToFind)
                 {
