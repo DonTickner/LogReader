@@ -363,8 +363,7 @@ namespace LogReader
 
             ManualScrollBar.IsEnabled = true;
 
-            CurrentFileComboBox.Visibility = Visibility.Visible;
-            CurrentFileTextBlock.Visibility = Visibility.Visible;
+            LogViewModel.FileControlVisibility = Visibility.Visible;
 
             ManualScrollBar.Value = ManualScrollBar.Minimum;
 
@@ -406,6 +405,16 @@ namespace LogReader
             LogViewModel.ExpandingView = true;
             long startingByteForNewRead = LogViewModel.LastLineEndingByte;
             ContinueReadFromByteLocation(startingByteForNewRead, FindByteLocationActorMessages.SearchDirection.Backward, 1);
+        }
+
+        private void RawToggleButton_OnCheckChanged(object sender, RoutedEventArgs e)
+        {
+            bool rawView = RawToggleButton.IsChecked ?? false;
+
+            LogViewModel.RawDisplayMode = rawView;
+
+            var test = Lines;
+            var test2 = LineTextBox;
         }
     }
 }

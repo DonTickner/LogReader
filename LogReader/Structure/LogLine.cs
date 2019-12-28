@@ -15,5 +15,10 @@ namespace LogReader.Structure
         public long StartingByte { get; set; }
         public long EndingByte { get; set; }
         public string File { get; set; }
+
+        public override string ToString()
+        {
+            return Line;
+        }
     }
 }

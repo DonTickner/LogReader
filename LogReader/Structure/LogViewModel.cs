@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using LogReader.Akka.Net.Actors;
 using LogReader.Annotations;
 using LogReader.Configuration;
@@ -27,6 +28,12 @@ namespace LogReader.Structure
             }
         }
 
+        public string LogLineBlock
+        {
+            get { return String.Join(string.Empty, _logLines); }
+            set { return; }
+        }
+
         public long FirstLineStartingByte => _logLines.Any() ? _logLines[0].StartingByte : 0;
 
         public long FirstLineEndingByte => _logLines.Any() ? _logLines[0].EndingByte : 0;
@@ -37,10 +44,9 @@ namespace LogReader.Structure
 
         private List<Tuple<string, int>> _logFileLines;
 
-        public List<string> LogFiles { get
-            {
-                return _logFileLocations.Select(l => l.Item1).ToList();
-            }
+        public List<string> LogFiles
+        { 
+            get { return _logFileLocations.Select(l => l.Item1).ToList(); }
         }
 
         public long TotalFileSizesInBytes
@@ -91,6 +97,35 @@ namespace LogReader.Structure
 
             _logFileLines = new List<Tuple<string, int>>();
             _logFileLocations = new List<Tuple<string, long>>();
+
+            FileControlVisibility = Visibility.Collapsed;
+        }
+
+        private Visibility _fileControlVisibility;
+
+        public Visibility FileControlVisibility
+        {
+            get { return _fileControlVisibility; }
+            set
+            {
+                _fileControlVisibility = value;
+                OnPropertyChanged(nameof(FileControlVisibility));
+            }
+        }
+
+        private bool _rawDisplayMode;
+        public bool RawDisplayMode
+        {
+            get { return _rawDisplayMode; }
+            set
+            {
+                _rawDisplayMode = value;
+                OnPropertyChanged(nameof(RawDisplayMode));
+                if (_rawDisplayMode)
+                {
+                    OnPropertyChanged(nameof(LogLineBlock));
+                }
+            }
         }
 
         /// <summary>
@@ -124,6 +159,14 @@ namespace LogReader.Structure
             OnPropertyChanged(nameof(CurrentLineToUpdate));
             OnPropertyChanged(nameof(IsReading));
             OnPropertyChanged(nameof(CurrentLogFile));
+
+            if (RawDisplayMode)
+            {
+                if (CurrentLineToUpdate >= _logLines.Count)
+                {
+                    OnPropertyChanged(nameof(LogLineBlock));
+                }
+            }
         }
 
         private LogLine CreateNewLogLine(ReadLineFromFileActor.ReturnedLine line)
