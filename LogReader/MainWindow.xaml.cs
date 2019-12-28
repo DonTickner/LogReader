@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using Akka.Actor;
 using Akka.Configuration;
@@ -275,28 +276,6 @@ namespace LogReader
             return null;
         }
 
-        private void MainWindow_OnSizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            if (null == LogViewModel)
-            {
-                return;
-            }
-
-            if (LogViewModel.IsReading)
-            {
-                return;
-            }
-
-            if (e.NewSize.Height <= e.PreviousSize.Height)
-            {
-                return;
-            }
-
-            LogViewModel.ExpandingView = true;
-            long startingByteForNewRead = LogViewModel.LastLineEndingByte;
-            ContinueReadFromByteLocation(startingByteForNewRead, FindByteLocationActorMessages.SearchDirection.Backward, 1);
-        }
-
         void DataGrid_ScrollChanged(object sender, RoutedEventArgs e)
         {
             if (null == LogViewModel)
@@ -394,9 +373,39 @@ namespace LogReader
 
         private void CurrentFileComboBox_OnSelected(object sender, RoutedEventArgs e)
         {
+            if (!CurrentFileComboBox.IsDropDownOpen && !CurrentFileComboBox.IsKeyboardFocused)
+            {
+                return;
+            }
+
             long fileRelativeStartingByte =
                 LogViewModel.CreateRelativeByteReference(0, CurrentFileComboBox.SelectedItem as string);
             BeginNewReadAtByteLocation(fileRelativeStartingByte, FindByteLocationActorMessages.SearchDirection.Backward, 1, true);
+        }
+
+        private void DataGrid_SizeChanged(object sender, EventArgs e)
+        {
+            if (null == LogViewModel)
+            {
+                return;
+            }
+
+            if (LogViewModel.IsReading)
+            {
+                return;
+            }
+
+            double dataGridActualHeight = Lines.ActualHeight;
+            double rowHeight = Lines.RowHeight * Lines.Items.Count;
+
+            if (dataGridActualHeight < rowHeight)
+            {
+                return;
+            }
+
+            LogViewModel.ExpandingView = true;
+            long startingByteForNewRead = LogViewModel.LastLineEndingByte;
+            ContinueReadFromByteLocation(startingByteForNewRead, FindByteLocationActorMessages.SearchDirection.Backward, 1);
         }
     }
 }

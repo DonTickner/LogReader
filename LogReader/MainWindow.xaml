@@ -11,8 +11,7 @@
         mc:Ignorable="d"
         Title="MainWindow" Height="425" Width="744" MinWidth="744" MinHeight="200"
         WindowStyle="ThreeDBorderWindow"
-        Loaded="MainWindow_OnLoaded"
-        SizeChanged="MainWindow_OnSizeChanged">
+        Loaded="MainWindow_OnLoaded">
     <Window.CommandBindings>
         <CommandBinding Command="commands:UICommands.GoToLineCommand" CanExecute="GoToLineCommand_OnCanExecute" Executed="GoToLineCommand_Executed"/>
         <CommandBinding Command="commands:UICommands.OpenLog4NetConfigCommand" CanExecute="OpenLog4NetConfig_OnCanExecute"  Executed="OpenLog4NetConfig_OnExecuted"/>
@@ -32,7 +31,19 @@
         </Grid.ColumnDefinitions>
         <TextBox x:Name="LineTextBox" Margin="10,10,10,10" Grid.Column="1" Grid.ColumnSpan="2" Grid.Row="2" Visibility="Hidden" Grid.RowSpan="2"/>
         <ScrollBar x:Name="ManualScrollBar" Scroll="ManualScrollBar_OnScroll" Maximum="{Binding CalculatedScrollableMaximum}" Grid.Column="3" Grid.Row="2" Margin="0,0,10,0"/>
-        <DataGrid x:Name="Lines" ItemsSource="{Binding LogLines}" AutoGenerateColumns="False" ScrollViewer.ScrollChanged="DataGrid_ScrollChanged" CanUserAddRows="false" Background="Transparent" SelectionMode="Single" Grid.Column="1" Grid.Row="2" Grid.ColumnSpan="2">
+        <DataGrid x:Name="Lines"
+                  ItemsSource="{Binding LogLines}"
+                  AutoGenerateColumns="False"
+                  ScrollViewer.ScrollChanged="DataGrid_ScrollChanged"
+                  SizeChanged="DataGrid_SizeChanged"
+                  CanUserAddRows="false"
+                  Background="Transparent"
+                  SelectionMode="Single"
+                  Grid.Column="1"
+                  Grid.Row="2"
+                  Grid.ColumnSpan="2"
+                  CanUserResizeRows="False"
+                  RowHeight="25">
             <DataGrid.Columns>
                 <DataGridTextColumn Binding="{Binding Line}"/>
             </DataGrid.Columns>

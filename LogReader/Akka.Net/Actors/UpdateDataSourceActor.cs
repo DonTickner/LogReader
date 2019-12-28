@@ -66,7 +66,8 @@ namespace LogReader.Akka.Net.Actors
 
             long startingByte = message.ReturnedLine.LineEndsAtByteLocation;
 
-            if (_dataSourceToUpdate.LogViewModel.IsReading)
+            if (_dataSourceToUpdate.LogViewModel.IsReading
+            || _dataSourceToUpdate.LogViewModel.ExpandingView)
             {
                 long relativeReference =
                     _dataSourceToUpdate.LogViewModel.CreateRelativeByteReference(startingByte,
