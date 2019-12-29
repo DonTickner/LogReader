@@ -22,7 +22,7 @@ namespace LogReader.UnitTests
                 new Tuple<string, long>("log4", 663),
                 new Tuple<string, long>("log5", 883)
             };
-            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+            testLogViewModel.CreateLogFiles(testLogFileLocations);
             long relativeByte = 800;
 
             // Perform test
@@ -48,7 +48,7 @@ namespace LogReader.UnitTests
                 new Tuple<string, long>("log4", 665),
                 new Tuple<string, long>("log5", 885)
             };
-            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+            testLogViewModel.CreateLogFiles(testLogFileLocations);
             long relativeByte = 0;
 
             // Perform test
@@ -74,7 +74,7 @@ namespace LogReader.UnitTests
                 new Tuple<string, long>("log4", 660),
                 new Tuple<string, long>("log5", 880)
             };
-            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+            testLogViewModel.CreateLogFiles(testLogFileLocations);
             long relativeByte =320;
 
             // Perform test
@@ -100,7 +100,7 @@ namespace LogReader.UnitTests
                 new Tuple<string, long>("log4", 662),
                 new Tuple<string, long>("log5", 882)
             };
-            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+            testLogViewModel.CreateLogFiles(testLogFileLocations);
             long relativeByte = 323;
 
             // Perform test
@@ -126,7 +126,7 @@ namespace LogReader.UnitTests
                 new Tuple<string, long>("log4", 660),
                 new Tuple<string, long>("log5", 880)
             };
-            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+            testLogViewModel.CreateLogFiles(testLogFileLocations);
             long relativeByte = 2299;
 
             // Perform test
@@ -152,7 +152,7 @@ namespace LogReader.UnitTests
                 new Tuple<string, long>("log4", 660),
                 new Tuple<string, long>("log5", 880)
             };
-            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+            testLogViewModel.CreateLogFiles(testLogFileLocations);
             long relativeByte = 2666;
 
             // Perform test
@@ -178,7 +178,7 @@ namespace LogReader.UnitTests
                 new Tuple<string, long>("log4", 660),
                 new Tuple<string, long>("log5", 880)
             };
-            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+            testLogViewModel.CreateLogFiles(testLogFileLocations);
             long relativeByte = -2666;
 
             // Perform test
@@ -204,7 +204,7 @@ namespace LogReader.UnitTests
                 new Tuple<string, long>("log4", 660),
                 new Tuple<string, long>("log5", 880)
             };
-            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+            testLogViewModel.CreateLogFiles(testLogFileLocations);
             long relativeByte = 1430;
 
             // Perform test
@@ -229,7 +229,7 @@ namespace LogReader.UnitTests
                 new Tuple<string, long>("log4", 660),
                 new Tuple<string, long>("log5", 880)
             };
-            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+            testLogViewModel.CreateLogFiles(testLogFileLocations);
             long relativeByte = 0;
 
             // Perform test
@@ -254,7 +254,7 @@ namespace LogReader.UnitTests
                 new Tuple<string, long>("log4", 660),
                 new Tuple<string, long>("log5", 880)
             };
-            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+            testLogViewModel.CreateLogFiles(testLogFileLocations);
             long relativeByte = 2299;
 
             // Perform test
@@ -279,7 +279,7 @@ namespace LogReader.UnitTests
                 new Tuple<string, long>("log4", 660),
                 new Tuple<string, long>("log5", 880)
             };
-            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+            testLogViewModel.CreateLogFiles(testLogFileLocations);
             long relativeByte = 100;
 
             // Perform test
@@ -304,7 +304,7 @@ namespace LogReader.UnitTests
                 new Tuple<string, long>("log4", 660),
                 new Tuple<string, long>("log5", 880)
             };
-            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+            testLogViewModel.CreateLogFiles(testLogFileLocations);
             long relativeByte = 99;
 
             // Perform test
@@ -329,7 +329,7 @@ namespace LogReader.UnitTests
                 new Tuple<string, long>("log4", 660),
                 new Tuple<string, long>("log5", 880)
             };
-            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+            testLogViewModel.CreateLogFiles(testLogFileLocations);
             long relativeByte = -99;
 
             // Perform test
@@ -354,7 +354,7 @@ namespace LogReader.UnitTests
                 new Tuple<string, long>("log4", 660),
                 new Tuple<string, long>("log5", 880)
             };
-            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+            testLogViewModel.CreateLogFiles(testLogFileLocations);
             long relativeByte = 6600;
 
             // Perform test
@@ -379,7 +379,7 @@ namespace LogReader.UnitTests
                 new Tuple<string, long>("log4", 660),
                 new Tuple<string, long>("log5", 880)
             };
-            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+            testLogViewModel.CreateLogFiles(testLogFileLocations);
 
             long byteWithinFile = 5;
             string logFileName = "log3";
@@ -406,7 +406,7 @@ namespace LogReader.UnitTests
                 new Tuple<string, long>("log4", 660),
                 new Tuple<string, long>("log5", 880)
             };
-            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+            testLogViewModel.CreateLogFiles(testLogFileLocations);
 
             long byteWithinFile = 220;
             string logFileName = "log2";
@@ -433,7 +433,7 @@ namespace LogReader.UnitTests
                 new Tuple<string, long>("log4", 660),
                 new Tuple<string, long>("log5", 880)
             };
-            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+            testLogViewModel.CreateLogFiles(testLogFileLocations);
 
             long byteWithinFile = 0;
             string logFileName = "log4";
@@ -460,7 +460,7 @@ namespace LogReader.UnitTests
                 new Tuple<string, long>("log4", 660),
                 new Tuple<string, long>("log5", 880)
             };
-            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+            testLogViewModel.CreateLogFiles(testLogFileLocations);
 
             long byteWithinFile = 455;
             string logFileName = "log3";
@@ -487,7 +487,7 @@ namespace LogReader.UnitTests
                 new Tuple<string, long>("log4", 660),
                 new Tuple<string, long>("log5", 880)
             };
-            testLogViewModel.SetLogFileLocations(testLogFileLocations);
+            testLogViewModel.CreateLogFiles(testLogFileLocations);
 
             long byteWithinFile = -455;
             string logFileName = "log3";

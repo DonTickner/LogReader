@@ -27,6 +27,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition MinHeight="100"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="10" MinHeight="10"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
@@ -72,7 +73,7 @@
             </DataGrid.Columns>
         </DataGrid>
         <TextBlock x:Name="CurrentFileTextBlock" Text="Current File: " Grid.Column="1" Grid.Row="2" Width="Auto" Margin="0, 0, 0, 0" VerticalAlignment="Center" Visibility="{Binding FileControlVisibility}"/>
-        <ComboBox x:Name="CurrentFileComboBox" Grid.Column="2" Grid.Row="2" Width="Auto" Margin="0, 0, 0, 0" ItemsSource="{Binding LogFiles}" Visibility="{Binding FileControlVisibility}" SelectedItem="{Binding CurrentLogFile}" SelectionChanged="CurrentFileComboBox_OnSelected"/>
+        <ComboBox x:Name="CurrentFileComboBox" Grid.Column="2" Grid.Row="2" Width="Auto" Margin="0, 0, 0, 0" ItemsSource="{Binding LogFileLocations}" Visibility="{Binding FileControlVisibility}" SelectedItem="{Binding CurrentLogFile}" SelectionChanged="CurrentFileComboBox_OnSelected"/>
         <Grid Visibility="Collapsed" x:Name="GotoPopup" Width="Auto" HorizontalAlignment="Left" VerticalAlignment="Bottom" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2">
             <Grid.Resources >
                 <Style TargetType="{x:Type Border}" >
@@ -92,7 +93,7 @@
                     <TextBlock x:Name="goToTextLabel" Text="Go To Line: " Grid.Column="0" TextAlignment="Center" VerticalAlignment="Center" Margin="5,0,5,0"/>
                     <TextBox:NumericalTextBox x:Name="goToNumberTextBox" Grid.Column="1" HorizontalAlignment="Center" Text="0" TextAlignment="Right" Width="100" Margin="5, 0, 5, 0"/>
                     <TextBlock x:Name="inTextLabel" Text="In" Grid.Column="2" Width="Auto" TextAlignment="Center" VerticalAlignment="Center" Margin="5, 0, 5, 0"/>
-                    <ComboBox x:Name="goToNumberFileComboBox" Grid.Column="3" Width="200" Margin="5, 0, 5, 0" ItemsSource="{Binding LogFiles}" HorizontalContentAlignment="Left" SelectedItem="{Binding CurrentLogFile}"/>
+                    <ComboBox x:Name="goToNumberFileComboBox" Grid.Column="3" Width="200" Margin="5, 0, 5, 0" ItemsSource="{Binding LogFileLocations}" HorizontalContentAlignment="Left" SelectedItem="{Binding CurrentLogFile}"/>
                     <button:ProgressButton Name="gotoProgressButton" Grid.Column="4" ProgressBackground="Green" ProgressOpacity="0.25" Text="Go" ProgressBarVisibility="Hidden" Click="goToNumberButton_Click" TextAlignment="Center" Width="100" Margin="5, 0, 5, 0"/>
                 </Grid>
             </Border>
@@ -109,5 +110,17 @@
                 </MenuItem.ToolTip>
             </MenuItem>
         </Menu>
+        <Grid Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Lines In File: " Grid.Column="0" VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding LinesInCurrentLogFile}" Grid.Column="1" VerticalAlignment="Center"/>
+            <TextBlock Text=" / " Grid.Column="2" VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding TotalNumberOfLinesInAllLogFiles}" Grid.Column="3" VerticalAlignment="Center"/>
+        </Grid>
     </Grid>
 </Window>

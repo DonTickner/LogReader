@@ -40,10 +40,12 @@ namespace LogReader.Akka.Net.Actors
     public class UpdateUIActor : BaseActorWithMessages<UpdateUIActorMessage>
     {
         private readonly Action<double> _updateProgressBarMethod;
+        private readonly Action<string, long> _updateFileLineCountMethod;
 
-        public UpdateUIActor(Action<double> updateProgressBarMethod)
+        public UpdateUIActor(Action<double> updateProgressBarMethod, Action<string, long> updateFileLineCountMethod)
         {
             _updateProgressBarMethod = updateProgressBarMethod;
+            _updateFileLineCountMethod = updateFileLineCountMethod;
         }
 
         protected override void OnReceive(object message)
@@ -58,6 +60,11 @@ namespace LogReader.Akka.Net.Actors
                 case UpdateUIActorMessage.DisplayMessageBox messageBoxMessage:
                 {
                     MessageBox.Show(messageBoxMessage.MessageText, messageBoxMessage.MessageCaption, messageBoxMessage.Buttons, messageBoxMessage.Image);
+                    break;
+                }
+                case FindByteLocationActorMessages.ByteOccurrencesInFile byteCountInFile:
+                {
+                    _updateFileLineCountMethod.Invoke(byteCountInFile.FilePath, byteCountInFile.NumberOfBytes);
                     break;
                 }
             }

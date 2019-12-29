@@ -49,12 +49,6 @@ namespace LogReader
             InitialSetup();
         }
 
-        private void Button_Click_2(object sender, RoutedEventArgs e)
-        {
-            MessageBox.Show($"There are {LogViewModel.TotalLinesInFiles} in {LogViewModel.TotalNumberOfLogFiles} files.", "Lines in File",
-                MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-
         #region Methods
 
         #region Setup
@@ -86,7 +80,7 @@ namespace LogReader
             var config = ConfigurationFactory.ParseString(@"akka.actor.default-dispatcher.shutdown { timeout = 0 }");
             _akkaActorSystem = ActorSystem.Create("MyActorSystem", config);
 
-            Props updateUIActorProps = Props.Create(() => new UpdateUIActor(gotoProgressButton.PerformStep)).WithDispatcher("akka.actor.synchronized-dispatcher");
+            Props updateUIActorProps = Props.Create(() => new UpdateUIActor(gotoProgressButton.PerformStep, null)).WithDispatcher("akka.actor.synchronized-dispatcher");
             _updateUIActor = _akkaActorSystem.ActorOf(updateUIActorProps, $"updateUI_{Guid.NewGuid()}");
 
             Props updateDataSourceActorProps = Props.Create(() => new UpdateDataSourceActor(this)).WithDispatcher("akka.actor.synchronized-dispatcher");
@@ -153,7 +147,19 @@ namespace LogReader
                 logFileLocations.Add(new Tuple<string, long>(filePath, fileSizeInBytes));
             }
 
-            LogViewModel.SetLogFileLocations(logFileLocations);
+            LogViewModel.CreateLogFiles(logFileLocations);
+
+            foreach (LogFileInfo logFileInfo in LogViewModel.LogFiles)
+            {
+                Props updateUIActorProps = Props.Create(() => new UpdateUIActor(null, LogViewModel.SetLogFileLineCount)).WithDispatcher("akka.actor.synchronized-dispatcher");
+                IActorRef updateUIActor = _akkaActorSystem.ActorOf(updateUIActorProps, $"updateUI_{Guid.NewGuid()}");
+
+                Props findStartingByteLocationActorProps = Props.Create(() => new FindByteLocationActor(null));
+                IActorRef findStartingByteActor = _akkaActorSystem.ActorOf(findStartingByteLocationActorProps, $"findStartingByteLocation_{Guid.NewGuid()}");
+
+                findStartingByteActor.Tell(new FindByteLocationActorMessages.CountByteOccurrencesInFile(ProgramConfig.LineFeedByte, logFileInfo.FileLocation, updateUIActor));
+                findStartingByteActor.Tell(PoisonPill.Instance);
+            }
         }
 
         private void ReadLine(long startingByte, bool overrideUi = false)

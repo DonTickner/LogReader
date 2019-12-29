@@ -16,7 +16,22 @@ namespace LogReader.Structure
     {
         public int CurrentLineToUpdate = 0;
 
-        public string CurrentLogFile { get; set; }
+        private string _currentLogFile;
+        public string CurrentLogFile
+        {
+            get { return _currentLogFile; }
+            set
+            {
+                _currentLogFile = value;
+                OnPropertyChanged(nameof(CurrentLogFile));
+                OnPropertyChanged(nameof(LinesInCurrentLogFile));
+            }
+        }
+
+        public long LinesInCurrentLogFile
+        {
+            get { return _logFiles.FirstOrDefault(l => l.FileLocation == CurrentLogFile)?.NumberOfLinesInFile ?? 0; }
+        }
 
         private ObservableCollection<LogLine> _logLines = new ObservableCollection<LogLine>();
         public ObservableCollection<LogLine> LogLines
@@ -40,31 +55,34 @@ namespace LogReader.Structure
 
         public long LastLineEndingByte => _logLines.Any() ? _logLines[^1].EndingByte : 0;
 
-        private List<Tuple<string, long>> _logFileLocations;
+        private List<LogFileInfo> _logFiles;
+        public List<LogFileInfo> LogFiles
+        {
+            get { return _logFiles; }
+            set { _logFiles = value; }
+        }
 
-        private List<Tuple<string, int>> _logFileLines;
-
-        public List<string> LogFiles
+        public List<string> LogFileLocations
         { 
-            get { return _logFileLocations.Select(l => l.Item1).ToList(); }
+            get { return _logFiles.Select(l => l.FileLocation).ToList(); }
         }
 
         public long TotalFileSizesInBytes
         {
-            get { return _logFileLocations.Sum(l => l.Item2); }
+            get { return _logFiles.Sum(l => l.FileSizeInByte); }
         }
 
         public long CalculatedScrollableMaximum
         {
-            get { return _logFileLocations.Sum(l => l.Item2) / 10; }
+            get { return TotalFileSizesInBytes / 10; }
         }
 
-        public long TotalLinesInFiles
+        public long TotalNumberOfLinesInAllLogFiles
         {
-            get { return _logFileLines.Sum(l => l.Item2); }
+            get { return _logFiles.Sum(l => l.NumberOfLinesInFile); }
         }
 
-        public int TotalNumberOfLogFiles => _logFileLocations.Count;
+        public int TotalNumberOfLogFiles => _logFiles.Count;
 
         public bool IsReading
         {
@@ -95,8 +113,7 @@ namespace LogReader.Structure
         {
             LogLines = new ObservableCollection<LogLine>();
 
-            _logFileLines = new List<Tuple<string, int>>();
-            _logFileLocations = new List<Tuple<string, long>>();
+            _logFiles = new List<LogFileInfo>();
 
             FileControlVisibility = Visibility.Collapsed;
         }
@@ -158,7 +175,6 @@ namespace LogReader.Structure
             CurrentLineToUpdate++;
             OnPropertyChanged(nameof(CurrentLineToUpdate));
             OnPropertyChanged(nameof(IsReading));
-            OnPropertyChanged(nameof(CurrentLogFile));
 
             if (RawDisplayMode)
             {
@@ -188,27 +204,31 @@ namespace LogReader.Structure
         public long CreateRelativeByteReference(long byteLocationWithinFile, string file)
         {
             long relativeByteReference = byteLocationWithinFile;
-            relativeByteReference = Math.Max(0, Math.Min(_logFileLocations.FirstOrDefault(t => t.Item1 == file)?.Item2 ?? 0, relativeByteReference));
+            relativeByteReference = Math.Max(0, Math.Min(_logFiles.FirstOrDefault(t => t.FileLocation == file)?.FileSizeInByte ?? 0, relativeByteReference));
 
-            foreach (Tuple<string, long> logFileLocation in _logFileLocations)
+            foreach (LogFileInfo logFileLocation in _logFiles)
             {
-                if (logFileLocation.Item1 == file)
+                if (logFileLocation.FileLocation == file)
                 {
                     break;
                 }
 
-                relativeByteReference += logFileLocation.Item2;
+                relativeByteReference += logFileLocation.FileSizeInByte;
             }
 
             return relativeByteReference;
         }
 
-        public void SetLogFileLocations(List<Tuple<string, long>> logFileLocations)
+        public void CreateLogFiles(List<Tuple<string, long>> logFileLocations)
         {
-            _logFileLocations = logFileLocations;
-            // CountLinesInFiles();
+            foreach (Tuple<string, long> logFileLocation in logFileLocations)
+            {
+                _logFiles.Add(new LogFileInfo(0, logFileLocation.Item1, logFileLocation.Item2));
+            }
+
             OnPropertyChanged(nameof(CalculatedScrollableMaximum));
             OnPropertyChanged(nameof(LogFiles));
+            OnPropertyChanged(nameof(LogFileLocations));
         }
 
         public string LocateLogFileFromByteReference(long byteLocation)
@@ -217,15 +237,15 @@ namespace LogReader.Structure
 
             string filePath = string.Empty;
             long byteOffset = 0;
-            foreach (Tuple<string, long> logFileLocation in _logFileLocations)
+            foreach (LogFileInfo logFile in _logFiles)
             {
-                if (clampedByteLocation >= (logFileLocation.Item2 + byteOffset))
+                if (clampedByteLocation >= (logFile.FileSizeInByte + byteOffset))
                 {
-                    byteOffset += logFileLocation.Item2;
+                    byteOffset += logFile.FileSizeInByte;
                     continue;
                 }
 
-                filePath = logFileLocation.Item1;
+                filePath = logFile.FileLocation;
                 break;
             }
 
@@ -242,66 +262,23 @@ namespace LogReader.Structure
 
             long relativeByte = clampedByteLocation;
             long byteOffset = 0;
-            foreach (Tuple<string, long> logFileLocation in _logFileLocations)
+            foreach (LogFileInfo logFile in _logFiles)
             {
-                if (_logFileLocations.IndexOf(logFileLocation) == _logFileLocations.Count - 1)
+                if (_logFiles.IndexOf(logFile) == _logFiles.Count - 1)
                 {
                     break;
                 }
 
-                if (clampedByteLocation < (logFileLocation.Item2 + byteOffset))
+                if (clampedByteLocation < (logFile.FileSizeInByte + byteOffset))
                 {
                     continue;
                 }
 
-                relativeByte -= logFileLocation.Item2;
-                byteOffset += logFileLocation.Item2;
+                relativeByte -= logFile.FileSizeInByte;
+                byteOffset += logFile.FileSizeInByte;
             }
 
             return relativeByte;
-        }
-
-        /// <summary>
-        /// Counts number of physical lines within the current file
-        /// </summary>
-        private void CountLinesInFiles()
-        {
-            _logFileLines = new List<Tuple<string, int>>();
-            foreach (Tuple<string, long> logFile in _logFileLocations)
-            {
-                byte[] buffer = new byte[ProgramConfig.ChunkSize];
-                int bytesRead = 0;
-                int linesInFile = 0;
-
-                using (FileStream fileStream = new FileStream(logFile.Item1, FileMode.Open, FileAccess.Read))
-                {
-                    while (bytesRead < logFile.Item2)
-                    {
-                        fileStream.Seek(Convert.ToInt32(bytesRead), SeekOrigin.Begin);
-                        fileStream.Read(buffer, 0, ProgramConfig.ChunkSize);
-                        linesInFile += CountLinesInChunk(buffer);
-                        bytesRead += ProgramConfig.ChunkSize;
-                    }
-                }
-
-                _logFileLines.Add(new Tuple<string, int>(logFile.Item1, linesInFile));
-            }
-        }
-
-        /// <summary>
-        /// Counts the number of lines in the passed byte array
-        /// </summary>
-        /// <param name="bytesToRead">The byte array that represent a memory chunk</param>
-        private int CountLinesInChunk(byte[] bytesToRead)
-        {
-            int linesInFile = 0;
-
-            for (int i = 0; i < bytesToRead.Length; i++)
-            {
-                linesInFile += bytesToRead[i] == ProgramConfig.LineFeedByte ? 1 : 0;
-            }
-
-            return linesInFile;
         }
 
         public void InitiateNewRead()
@@ -309,15 +286,6 @@ namespace LogReader.Structure
             CurrentLineToUpdate = 1;
             OnPropertyChanged(nameof(CurrentLineToUpdate));
             OnPropertyChanged(nameof(IsReading));
-        }
-
-        private ByteWindow CreateNewByteWindow(long start, long end)
-        {
-            return new ByteWindow
-            {
-                StartingByte = start,
-                EndingByte = end
-            };
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -341,9 +309,16 @@ namespace LogReader.Structure
 
         private long ClampByteLocation(long byteLocation)
         {
-            long totalBytes = _logFileLocations.Sum(a => a.Item2) - 1;
+            long totalBytes = _logFiles.Sum(a => a.FileSizeInByte) - 1;
             long clampedByteLocation = Math.Max(0, Math.Min(totalBytes, byteLocation));
             return clampedByteLocation;
+        }
+
+        public void SetLogFileLineCount(string logFile, long lineCount)
+        {
+            _logFiles.FirstOrDefault(l => l.FileLocation == logFile)?.SetLineCount(lineCount);
+            OnPropertyChanged(nameof(LinesInCurrentLogFile));
+            OnPropertyChanged(nameof(TotalNumberOfLinesInAllLogFiles));
         }
     }
 }
