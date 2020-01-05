@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Windows;
+using System.Windows.Markup;
 using Akka.Actor;
 
 namespace LogReader.Akka.Net.Actors
@@ -10,10 +11,12 @@ namespace LogReader.Akka.Net.Actors
     {
         public class UpdateProgressBar
         {
+            public Action<double> UpdateProgressBarMethod { get; }
             public double Step { get; }
-            public UpdateProgressBar(double step = 0)
+            public UpdateProgressBar(double step, Action<double> updateProgressBarMethod)
             {
                 Step = step;
+                UpdateProgressBarMethod = updateProgressBarMethod;
             }
         }
 
@@ -35,17 +38,26 @@ namespace LogReader.Akka.Net.Actors
                 Image = image;
             }
         }
+
+        public class UpdateTotalLinesInLogFile
+        {
+            public long NumberOfLinesInLogFile { get; private set; }
+            public string FilePathOfLogFile { get; private set; }
+            public Action<string, long> UpdateMethod { get; private set; }
+
+            public UpdateTotalLinesInLogFile(long numberOfLinesInLogFile, string filePathOfLogFile, Action<string, long> updateMethod)
+            {
+                NumberOfLinesInLogFile = numberOfLinesInLogFile;
+                FilePathOfLogFile = filePathOfLogFile;
+                UpdateMethod = updateMethod;
+            }
+        }
     }
 
     public class UpdateUIActor : BaseActorWithMessages<UpdateUIActorMessage>
     {
-        private readonly Action<double> _updateProgressBarMethod;
-        private readonly Action<string, long> _updateFileLineCountMethod;
-
-        public UpdateUIActor(Action<double> updateProgressBarMethod, Action<string, long> updateFileLineCountMethod)
+        public UpdateUIActor()
         {
-            _updateProgressBarMethod = updateProgressBarMethod;
-            _updateFileLineCountMethod = updateFileLineCountMethod;
         }
 
         protected override void OnReceive(object message)
@@ -54,7 +66,7 @@ namespace LogReader.Akka.Net.Actors
             {
                 case UpdateUIActorMessage.UpdateProgressBar updateProgressBar:
                 {
-                    _updateProgressBarMethod.Invoke(updateProgressBar.Step);
+                    updateProgressBar.UpdateProgressBarMethod.Invoke(updateProgressBar.Step);
                     break;
                 }
                 case UpdateUIActorMessage.DisplayMessageBox messageBoxMessage:
@@ -62,9 +74,9 @@ namespace LogReader.Akka.Net.Actors
                     MessageBox.Show(messageBoxMessage.MessageText, messageBoxMessage.MessageCaption, messageBoxMessage.Buttons, messageBoxMessage.Image);
                     break;
                 }
-                case FindByteLocationActorMessages.ByteOccurrencesInFile byteCountInFile:
+                case UpdateUIActorMessage.UpdateTotalLinesInLogFile byteCountInFile:
                 {
-                    _updateFileLineCountMethod.Invoke(byteCountInFile.FilePath, byteCountInFile.NumberOfBytes);
+                    byteCountInFile.UpdateMethod.Invoke(byteCountInFile.FilePathOfLogFile, byteCountInFile.NumberOfLinesInLogFile);
                     break;
                 }
             }

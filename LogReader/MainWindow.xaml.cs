@@ -14,6 +14,7 @@ using Log4Net.Extensions.Configuration.Implementation;
 using Log4Net.Extensions.Configuration.Implementation.ConfigObjects;
 using LogReader.Akka.Net.Actors;
 using LogReader.Configuration;
+using LogReader.Forms;
 using LogReader.Log4Net;
 using LogReader.Structure;
 
@@ -24,17 +25,6 @@ namespace LogReader
     /// </summary>
     public partial class MainWindow : Window
     {
-        #region Akka.Net
-
-        private ActorSystem _akkaActorSystem;
-
-        private IActorRef _findStartingByteActor;
-        private IActorRef _readLineFromFileActor;
-        private IActorRef _updateDataSourceActor;
-        private IActorRef _updateUIActor;
-
-        #endregion
-
         #region Data Objects
 
         private Log4NetConfig _log4NetConfig;
@@ -61,7 +51,6 @@ namespace LogReader
             ManualScrollBar.IsEnabled = false;
             
             SetupDataBinding();
-            SetupAkkaActorSystem();
         }
 
         /// <summary>
@@ -70,27 +59,6 @@ namespace LogReader
         private void SetupDataBinding()
         {
             DataContext = LogViewModel;
-        }
-
-        /// <summary>
-        /// Sets up the Akka.Net Actor System
-        /// </summary>
-        private void SetupAkkaActorSystem()
-        {
-            var config = ConfigurationFactory.ParseString(@"akka.actor.default-dispatcher.shutdown { timeout = 0 }");
-            _akkaActorSystem = ActorSystem.Create("MyActorSystem", config);
-
-            Props updateUIActorProps = Props.Create(() => new UpdateUIActor(gotoProgressButton.PerformStep, null)).WithDispatcher("akka.actor.synchronized-dispatcher");
-            _updateUIActor = _akkaActorSystem.ActorOf(updateUIActorProps, $"updateUI_{Guid.NewGuid()}");
-
-            Props updateDataSourceActorProps = Props.Create(() => new UpdateDataSourceActor(this)).WithDispatcher("akka.actor.synchronized-dispatcher");
-            _updateDataSourceActor = _akkaActorSystem.ActorOf(updateDataSourceActorProps, $"updateDataSource_{Guid.NewGuid()}");
-
-            Props readLineFromFileActorProps = Props.Create(() => new ReadLineFromFileActor(_updateDataSourceActor));
-            _readLineFromFileActor = _akkaActorSystem.ActorOf(readLineFromFileActorProps, $"readLineFromFile_{Guid.NewGuid()}");
-
-            Props findStartingByteLocationActorProps = Props.Create(() => new FindByteLocationActor(_readLineFromFileActor));
-            _findStartingByteActor = _akkaActorSystem.ActorOf(findStartingByteLocationActorProps, $"findStartingByteLocation_{Guid.NewGuid()}");
         }
 
         #endregion
@@ -111,110 +79,6 @@ namespace LogReader
                 _log4NetConfig = log4NetOpenFileDialog.Log4NetConfig;
             }
         }
-        
-        private void LoadLogFiles()
-        {
-            Appender rollingFileAppender =
-                _log4NetConfig.AppendersOfType(AppenderType.RollingFileAppender).FirstOrDefault();
-
-            if (null == rollingFileAppender)
-            {
-                throw new ArgumentNullException($"No Rolling File Appender found.");
-            }
-
-            DirectoryInfo logDirectory = new DirectoryInfo(rollingFileAppender.FolderPath);
-            FileInfo[] filesInDirectory = logDirectory.GetFiles().OrderByDescending(f => f.LastWriteTime).ToArray();
-
-            List<FileInfo> log4NetConfigFiles = new List<FileInfo>();
-            long totalFileSizes = 0;
-
-            List<Tuple<string, long>> logFileLocations = new List<Tuple<string, long>>();
-            foreach (var logFile in filesInDirectory.Where(l => l.FullName.Contains(rollingFileAppender.StaticFileNameMask)))
-            {
-                string filePath = logFile.FullName;
-                long fileSizeInBytes = logFile.Length;
-
-                try
-                {
-                    totalFileSizes += fileSizeInBytes;
-                }
-                catch
-                {
-                    // TODO: Implement handling for when total size of files exceeds content maximum of the Long
-                    break;
-                }
-
-                logFileLocations.Add(new Tuple<string, long>(filePath, fileSizeInBytes));
-            }
-
-            LogViewModel.CreateLogFiles(logFileLocations);
-
-            foreach (LogFileInfo logFileInfo in LogViewModel.LogFiles)
-            {
-                Props updateUIActorProps = Props.Create(() => new UpdateUIActor(null, LogViewModel.SetLogFileLineCount)).WithDispatcher("akka.actor.synchronized-dispatcher");
-                IActorRef updateUIActor = _akkaActorSystem.ActorOf(updateUIActorProps, $"updateUI_{Guid.NewGuid()}");
-
-                Props findStartingByteLocationActorProps = Props.Create(() => new FindByteLocationActor(null));
-                IActorRef findStartingByteActor = _akkaActorSystem.ActorOf(findStartingByteLocationActorProps, $"findStartingByteLocation_{Guid.NewGuid()}");
-
-                findStartingByteActor.Tell(new FindByteLocationActorMessages.CountByteOccurrencesInFile(ProgramConfig.LineFeedByte, logFileInfo.FileLocation, updateUIActor));
-                findStartingByteActor.Tell(PoisonPill.Instance);
-            }
-        }
-
-        private void ReadLine(long startingByte, bool overrideUi = false)
-        {
-            LogViewModel.InitiateNewRead();
-            _readLineFromFileActor.Tell(new ReadLineFromFileActorMessages.ReadLineFromFileStartingAtByte(
-                LogViewModel.LocateLogFileFromByteReference(startingByte), LogViewModel.TranslateRelativeBytePosition(startingByte),
-                overrideUi));
-        }
-
-        private void BeginNewReadAtByteLocation(long startingByte,
-            FindByteLocationActorMessages.SearchDirection searchDirection, int numberOfInstancesToFind, bool overrideUI = false)
-        {
-            LogViewModel.InitiateNewRead();
-            _findStartingByteActor.Tell(
-                new FindByteLocationActorMessages.FindNumeredInstanceOfByteLocationInFile(
-                    LogViewModel.TranslateRelativeBytePosition(startingByte),
-            ProgramConfig.LineFeedByte,
-                    searchDirection,
-                LogViewModel.LocateLogFileFromByteReference(startingByte),
-                numberOfInstancesToFind,
-                overrideUI));
-        }
-
-        private void BeginReadAtNewSpecificByteIndexLocation(FindByteLocationActorMessages.SearchDirection searchDirection, long numberOfInstancesToFind, string file, bool overrideUI = false)
-        {
-            BeginReadAtNewSpecificByteIndexLocationAndUpdate(searchDirection, numberOfInstancesToFind, file, null, overrideUI);
-        }
-
-        private void BeginReadAtNewSpecificByteIndexLocationAndUpdate(FindByteLocationActorMessages.SearchDirection searchDirection, long numberOfInstancesToFind, string file, IActorRef updateUIActor, bool overrideUI)
-        {
-            LogViewModel.InitiateNewRead();
-            _findStartingByteActor.Tell(
-                new FindByteLocationActorMessages.FindNumeredInstanceOfByteLocationInFileAndUpdateOnProgress(
-                0,
-                ProgramConfig.LineFeedByte,
-                searchDirection,
-                file,
-                numberOfInstancesToFind,
-                overrideUI,
-                updateUIActor));
-        }
-
-        private void ContinueReadFromByteLocation(long startingByte,
-            FindByteLocationActorMessages.SearchDirection searchDirection, int numberOfInstancesToFind, bool overrideUI = false)
-        {
-            _findStartingByteActor.Tell(
-                new FindByteLocationActorMessages.FindNumeredInstanceOfByteLocationInFile(
-                    LogViewModel.TranslateRelativeBytePosition(startingByte),
-                    ProgramConfig.LineFeedByte,
-                    searchDirection,
-                    LogViewModel.LocateLogFileFromByteReference(startingByte),
-                    numberOfInstancesToFind,
-                    overrideUI));
-        }
 
         #endregion
 
@@ -233,7 +97,7 @@ namespace LogReader
 
             if (e.ScrollEventType == ScrollEventType.SmallIncrement)
             {
-                ReadLine(LogViewModel.FirstLineEndingByte, true);
+                LogViewModel.ReadLine(LogViewModel.FirstLineEndingByte, true);
             }
             else
             {
@@ -251,7 +115,7 @@ namespace LogReader
                     overrideUI = true;
                 }                                                                                                                                                                                  
 
-                BeginNewReadAtByteLocation(startingByte, FindByteLocationActorMessages.SearchDirection.Backward, numberOfInstancesToFind, overrideUI);
+                LogViewModel.BeginNewReadAtByteLocation(startingByte, FindByteLocationActorMessages.SearchDirection.Backward, numberOfInstancesToFind, overrideUI);
             }
         }
 
@@ -347,7 +211,12 @@ namespace LogReader
             gotoProgressButton.MaxValue = Math.Max(goToNumberTextBox.NumericalValue, 1);
             gotoProgressButton.StepValue = 1;
             
-            BeginReadAtNewSpecificByteIndexLocationAndUpdate(FindByteLocationActorMessages.SearchDirection.Forward, Math.Max(0, goToNumberTextBox.NumericalValue - 1), goToNumberFileComboBox.SelectedItem as string, _updateUIActor, true);
+            LogViewModel.BeginReadAtNewSpecificByteIndexLocationAndUpdate(
+                FindByteLocationActorMessages.SearchDirection.Forward,
+                Math.Max(0, goToNumberTextBox.NumericalValue - 1), 
+                goToNumberFileComboBox.SelectedItem as string, 
+                true,
+                gotoProgressButton.PerformStep);
         }
 
         private void OpenLog4NetConfig_OnCanExecute(object sender, CanExecuteRoutedEventArgs e)
@@ -363,17 +232,13 @@ namespace LogReader
                 return;
             }
 
-            LoadLogFiles();
+            LogViewModel.LoadLogFilesIntoLogViewModel(_log4NetConfig);
 
             LineTextBox.Text = string.Empty;
-
             ManualScrollBar.IsEnabled = true;
-
-            LogViewModel.FileControlVisibility = Visibility.Visible;
-
             ManualScrollBar.Value = ManualScrollBar.Minimum;
 
-            ReadLine(0);
+            LogViewModel.ReadLine(0);
         }
 
         private void CurrentFileComboBox_OnSelected(object sender, RoutedEventArgs e)
@@ -385,7 +250,7 @@ namespace LogReader
 
             long fileRelativeStartingByte =
                 LogViewModel.CreateRelativeByteReference(0, CurrentFileComboBox.SelectedItem as string);
-            BeginNewReadAtByteLocation(fileRelativeStartingByte, FindByteLocationActorMessages.SearchDirection.Backward, 1, true);
+            LogViewModel.BeginNewReadAtByteLocation(fileRelativeStartingByte, FindByteLocationActorMessages.SearchDirection.Backward, 1, true);
         }
 
         private void DataGrid_SizeChanged(object sender, EventArgs e)
@@ -410,7 +275,7 @@ namespace LogReader
 
             LogViewModel.ExpandingView = true;
             long startingByteForNewRead = LogViewModel.LastLineEndingByte;
-            ContinueReadFromByteLocation(startingByteForNewRead, FindByteLocationActorMessages.SearchDirection.Backward, 1);
+            LogViewModel.ContinueReadFromByteLocation(startingByteForNewRead, FindByteLocationActorMessages.SearchDirection.Backward, 1);
         }
 
         private void RawToggleButton_OnCheckChanged(object sender, RoutedEventArgs e)
@@ -421,6 +286,17 @@ namespace LogReader
 
             var test = Lines;
             var test2 = LineTextBox;
+        }
+
+        private void SearchCommand_OnCanExecute(object sender, CanExecuteRoutedEventArgs e)
+        {
+            e.CanExecute = LogViewModel?.HasLoaded ?? false;
+        }
+
+        private void SearchCommand_OnExecuted(object sender, ExecutedRoutedEventArgs e)
+        {
+            SearchDialog searchDialog = new SearchDialog(LogViewModel);
+            searchDialog.Show();
         }
     }
 }

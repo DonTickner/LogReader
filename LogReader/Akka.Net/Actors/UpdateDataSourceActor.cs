@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 using Akka.Actor;
+using LogReader.Structure;
 
 namespace LogReader.Akka.Net.Actors
 {
@@ -32,11 +33,11 @@ namespace LogReader.Akka.Net.Actors
 
     public class UpdateDataSourceActor: BaseActorWithMessages<UpdateDataSourceActorMessage>
     {
-        private readonly MainWindow _dataSourceToUpdate;
+        private readonly LogViewModel _logViewModel;
 
-        public UpdateDataSourceActor(MainWindow dataSource)
+        public UpdateDataSourceActor(LogViewModel logViewModel)
         {
-            _dataSourceToUpdate = dataSource;
+            _logViewModel = logViewModel;
         }
 
         protected override void OnReceive(object message)
@@ -56,27 +57,27 @@ namespace LogReader.Akka.Net.Actors
             if (message.OverrideUI)
             {
                 long relativeStartReference =
-                    _dataSourceToUpdate.LogViewModel.CreateRelativeByteReference(message.ReturnedLine.LineStartsAtByteLocation,
+                    _logViewModel.CreateRelativeByteReference(message.ReturnedLine.LineStartsAtByteLocation,
                         message.ReturnedLine.FilePath);
 
-                _dataSourceToUpdate.ManualScrollBar.Value = relativeStartReference / 10;
+                _logViewModel.CurrentScrollPosition = relativeStartReference / 10;
             }
 
-            _dataSourceToUpdate.LogViewModel.AddLine(message.ReturnedLine);
+            _logViewModel.AddLine(message.ReturnedLine);
 
             long startingByte = message.ReturnedLine.LineEndsAtByteLocation;
 
-            if (_dataSourceToUpdate.LogViewModel.IsReading
-            || _dataSourceToUpdate.LogViewModel.ExpandingView)
+            if (_logViewModel.IsReading
+            || _logViewModel.ExpandingView)
             {
                 long relativeReference =
-                    _dataSourceToUpdate.LogViewModel.CreateRelativeByteReference(startingByte,
+                    _logViewModel.CreateRelativeByteReference(startingByte,
                         message.ReturnedLine.FilePath);
 
                 Sender.Tell(
                     new ReadLineFromFileActorMessages.ReadLineFromFileStartingAtByte(
-                        _dataSourceToUpdate.LogViewModel.LocateLogFileFromByteReference(relativeReference),
-                        _dataSourceToUpdate.LogViewModel.TranslateRelativeBytePosition(relativeReference),
+                        _logViewModel.LocateLogFileFromByteReference(relativeReference),
+                        _logViewModel.TranslateRelativeBytePosition(relativeReference),
                         false));
             }
         }

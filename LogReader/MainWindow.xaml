@@ -10,12 +10,17 @@
     xmlns:converter="clr-namespace:WPF.BespokeControls.Converter;assembly=WPF.BespokeControls"
     x:Class="LogReader.MainWindow"
         mc:Ignorable="d"
-        Title="MainWindow" Height="425" Width="744" MinWidth="744" MinHeight="200"
+        Title="Log Reader"
+        Height="425"
+        Width="744"
+        MinWidth="744"
+        MinHeight="425"
         WindowStyle="ThreeDBorderWindow"
         Loaded="MainWindow_OnLoaded">
     <Window.CommandBindings>
         <CommandBinding Command="commands:UICommands.GoToLineCommand" CanExecute="GoToLineCommand_OnCanExecute" Executed="GoToLineCommand_Executed"/>
         <CommandBinding Command="commands:UICommands.OpenLog4NetConfigCommand" CanExecute="OpenLog4NetConfig_OnCanExecute"  Executed="OpenLog4NetConfig_OnExecuted"/>
+        <CommandBinding Command="commands:UICommands.SearchCommand" CanExecute="SearchCommand_OnCanExecute"  Executed="SearchCommand_OnExecuted"/>
     </Window.CommandBindings>
     <Window.Resources>
         <converter:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
@@ -53,7 +58,13 @@
                  Grid.Row="3"
                  Visibility="{Binding RawDisplayMode, Converter={StaticResource BoolToVisibilityConverter}}"
                  Text ="{Binding LogLineBlock}"/>
-        <ScrollBar x:Name="ManualScrollBar" Scroll="ManualScrollBar_OnScroll" Maximum="{Binding CalculatedScrollableMaximum}" Grid.Column="3" Grid.Row="3" Margin="0,0,10,0"/>
+        <ScrollBar x:Name="ManualScrollBar"
+                   Scroll="ManualScrollBar_OnScroll"
+                   Maximum="{Binding CalculatedScrollableMaximum}" 
+                   Value="{Binding CurrentScrollPosition}"
+                   Grid.Column="3" 
+                   Grid.Row="3" 
+                   Margin="0,0,10,0"/>
         <DataGrid x:Name="Lines"
                   Visibility="{Binding RawDisplayMode, Converter={StaticResource InverseBoolToVisibilityConverter}}"
                   ItemsSource="{Binding LogLines}"
@@ -107,6 +118,11 @@
             <MenuItem Header="Go To Line" Command="commands:UICommands.GoToLineCommand">
                 <MenuItem.ToolTip>
                     <ToolTip>Moves to a specific line in a file.</ToolTip>
+                </MenuItem.ToolTip>
+            </MenuItem>
+            <MenuItem Header="Find" Command="commands:UICommands.SearchCommand">
+                <MenuItem.ToolTip>
+                    <ToolTip>Searches for content within the log files.</ToolTip>
                 </MenuItem.ToolTip>
             </MenuItem>
         </Menu>

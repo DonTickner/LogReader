@@ -67,7 +67,9 @@ namespace LogReader.Akka.Net.Actors
 
             public IActorRef UpdateUIActor { get; private set; }
 
-            public FindNumeredInstanceOfByteLocationInFileAndUpdateOnProgress(long startingByte, byte byteToFind, SearchDirection searchDirection, string filePath, long instanceNumberToFind, bool overrideUI, IActorRef updateUIActor)
+            public Action<double> UpdateAction { get; private set; }
+
+            public FindNumeredInstanceOfByteLocationInFileAndUpdateOnProgress(long startingByte, byte byteToFind, SearchDirection searchDirection, string filePath, long instanceNumberToFind, bool overrideUI, IActorRef updateUIActor, Action<double> updateAction)
             {
                 StartingByteNumber = startingByte;
                 ByteToFind = byteToFind;
@@ -76,6 +78,7 @@ namespace LogReader.Akka.Net.Actors
                 InstanceNumberToFind = instanceNumberToFind;
                 OverrideUI = overrideUI;
                 UpdateUIActor = updateUIActor;
+                UpdateAction = updateAction;
             }
         }
 
@@ -87,23 +90,14 @@ namespace LogReader.Akka.Net.Actors
 
             public IActorRef ActorToAdviseCountOf { get; private set; }
 
-            public CountByteOccurrencesInFile(byte byteToFind, string filePath, IActorRef actorToAdviseCountOf)
+            public Action<string, long> MethodToUpdateCount { get; private set; }
+
+            public CountByteOccurrencesInFile(byte byteToFind, string filePath, IActorRef actorToAdviseCountOf, Action<string, long> methodToUpdateCount)
             {
                 ByteToFind = byteToFind;
                 FilePath = filePath;
                 ActorToAdviseCountOf = actorToAdviseCountOf;
-            }
-        }
-
-        public class ByteOccurrencesInFile
-        {
-            public long NumberOfBytes { get; private set; }
-            public string FilePath { get; private set; }
-
-            public ByteOccurrencesInFile(long numberOfBytes, string filePath)
-            {
-                NumberOfBytes = numberOfBytes;
-                FilePath = filePath;
+                MethodToUpdateCount = methodToUpdateCount;
             }
         }
     }
@@ -129,7 +123,7 @@ namespace LogReader.Akka.Net.Actors
                 case FindByteLocationActorMessages.FindNumeredInstanceOfByteLocationInFile findInstanceInFileMessage:
                     {
                         FindByteLocationActorMessages.FindNumeredInstanceOfByteLocationInFileAndUpdateOnProgress newMessage =
-                                new FindByteLocationActorMessages.FindNumeredInstanceOfByteLocationInFileAndUpdateOnProgress(findInstanceInFileMessage.StartingByteNumber, findInstanceInFileMessage.ByteToFind, findInstanceInFileMessage.SearchDirection, findInstanceInFileMessage.FilePath, findInstanceInFileMessage.InstanceNumberToFind, findInstanceInFileMessage.OverrideUI, null);
+                                new FindByteLocationActorMessages.FindNumeredInstanceOfByteLocationInFileAndUpdateOnProgress(findInstanceInFileMessage.StartingByteNumber, findInstanceInFileMessage.ByteToFind, findInstanceInFileMessage.SearchDirection, findInstanceInFileMessage.FilePath, findInstanceInFileMessage.InstanceNumberToFind, findInstanceInFileMessage.OverrideUI, null, null);
 
                         long byteLocation = SearchForByteInFile(newMessage);
                         if (byteLocation >= 0)
@@ -150,7 +144,7 @@ namespace LogReader.Akka.Net.Actors
                 case FindByteLocationActorMessages.CountByteOccurrencesInFile countByteMessage:
                     {
                         long byteCount = CountBytesInFile(countByteMessage);
-                        countByteMessage.ActorToAdviseCountOf.Tell(new FindByteLocationActorMessages.ByteOccurrencesInFile(byteCount, countByteMessage.FilePath));
+                        countByteMessage.ActorToAdviseCountOf.Tell(new UpdateUIActorMessage.UpdateTotalLinesInLogFile(byteCount, countByteMessage.FilePath, countByteMessage.MethodToUpdateCount));
                         break;
                     }
             }
@@ -162,12 +156,10 @@ namespace LogReader.Akka.Net.Actors
         /// <param name="message">The <see cref="FindByteLocationInFile"/> message to process.</param>
         private long SearchForByteInFile(FindByteLocationActorMessages.FindNumeredInstanceOfByteLocationInFileAndUpdateOnProgress message)
         {
-            IActorRef updateUIActor = message.UpdateUIActor;
-
             if (message.StartingByteNumber == 0
                 && message.SearchDirection == FindByteLocationActorMessages.SearchDirection.Backward)
             {
-                CompleteSearch(updateUIActor);
+                CompleteSearch(message.UpdateUIActor, message.UpdateAction);
                 return 0;
             }
 
@@ -179,7 +171,7 @@ namespace LogReader.Akka.Net.Actors
 
             if (message.InstanceNumberToFind == 0)
             {
-                CompleteSearch(updateUIActor);
+                CompleteSearch(message.UpdateUIActor, message.UpdateAction);
                 return 0;
             }
 
@@ -237,13 +229,13 @@ namespace LogReader.Akka.Net.Actors
                         if (progressToProgressStep >= progressStep)
                         {
                             progressToProgressStep = Math.Max(0, progressToProgressStep - progressStep);
-                            UpdateProgress(updateUIActor, numberFound / numberOfLoops);
+                            UpdateProgress(message.UpdateUIActor, message.UpdateAction, numberFound / numberOfLoops);
                         }
                     }
 
                     if (numberFound >= message.InstanceNumberToFind)
                     {
-                        CompleteSearch(updateUIActor);
+                        CompleteSearch(message.UpdateUIActor, message.UpdateAction);
                         return chunkStartingAtByte + byteLocation + 1;
                     }
 
@@ -251,7 +243,7 @@ namespace LogReader.Akka.Net.Actors
                 }
             }
 
-            SearchError(updateUIActor);
+            SearchError(message.UpdateUIActor, message.UpdateAction);
             return -1;
         }
 
@@ -318,20 +310,20 @@ namespace LogReader.Akka.Net.Actors
             return numberFound;
         }
 
-        private void UpdateProgress(IActorRef actor, decimal percentageComplete)
+        private void UpdateProgress(IActorRef actor, Action<double> updateAction, decimal percentageComplete)
         {
-            actor?.Tell(new UpdateUIActorMessage.UpdateProgressBar((double)percentageComplete));
+            actor?.Tell(new UpdateUIActorMessage.UpdateProgressBar((double)percentageComplete, updateAction));
         }
 
-        private void CompleteSearch(IActorRef actor)
+        private void CompleteSearch(IActorRef actor, Action<double> updateAction)
         {
-            UpdateProgress(actor, 1);
+            UpdateProgress(actor, updateAction, 1);
         }
 
-        private void SearchError(IActorRef actor)
+        private void SearchError(IActorRef actor, Action<double> updateAction)
         {
             actor.Tell(new UpdateUIActorMessage.DisplayMessageBox("End of File exceeded. Unable to proceed.", "File Navigation Error", MessageBoxButton.OK, MessageBoxImage.Exclamation));
-            CompleteSearch(actor);
+            CompleteSearch(actor, updateAction);
         }
     }
 }
