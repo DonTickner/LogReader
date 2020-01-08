@@ -9,6 +9,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using Akka.Util;
+using LogReader.Akka.Net.Actors;
 using LogReader.Structure;
 
 namespace LogReader.Forms
@@ -36,8 +38,19 @@ namespace LogReader.Forms
 
         private void SearchProgressButton_OnClick(object sender, RoutedEventArgs e)
         {
-            ResultsListView.Items.Clear();
             ResultsGrid.Visibility = Visibility.Visible;
+
+            bool currentFileOnly = CurrentFileRadioButton.IsChecked.HasValue && CurrentFileRadioButton.IsChecked.Value;
+
+            _logViewModel.BeginSearch(FindTextTextBox.Text, currentFileOnly);
+        }
+
+        private void ResultsListView_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (ResultsListView.SelectedItem is SearchResult result)
+            {
+                _logViewModel.BeginNewReadInSpecificFileAtByteLocation(result.ByteStartingPosition, result.LogFilePath);
+            }
         }
     }
 }

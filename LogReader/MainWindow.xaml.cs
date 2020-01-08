@@ -115,7 +115,7 @@ namespace LogReader
                     overrideUI = true;
                 }                                                                                                                                                                                  
 
-                LogViewModel.BeginNewReadAtByteLocation(startingByte, FindByteLocationActorMessages.SearchDirection.Backward, numberOfInstancesToFind, overrideUI);
+                LogViewModel.BeginNewRead(startingByte, FindByteLocationActorMessages.SearchDirection.Backward, numberOfInstancesToFind, overrideUI);
             }
         }
 
@@ -211,11 +211,8 @@ namespace LogReader
             gotoProgressButton.MaxValue = Math.Max(goToNumberTextBox.NumericalValue, 1);
             gotoProgressButton.StepValue = 1;
             
-            LogViewModel.BeginReadAtNewSpecificByteIndexLocationAndUpdate(
-                FindByteLocationActorMessages.SearchDirection.Forward,
-                Math.Max(0, goToNumberTextBox.NumericalValue - 1), 
-                goToNumberFileComboBox.SelectedItem as string, 
-                true,
+            LogViewModel.BeginNewReadAtByteOccurrenceNumber(Math.Max(0, goToNumberTextBox.NumericalValue - 1),
+                goToNumberFileComboBox.SelectedItem as string,
                 gotoProgressButton.PerformStep);
         }
 
@@ -237,8 +234,6 @@ namespace LogReader
             LineTextBox.Text = string.Empty;
             ManualScrollBar.IsEnabled = true;
             ManualScrollBar.Value = ManualScrollBar.Minimum;
-
-            LogViewModel.ReadLine(0);
         }
 
         private void CurrentFileComboBox_OnSelected(object sender, RoutedEventArgs e)
@@ -250,7 +245,7 @@ namespace LogReader
 
             long fileRelativeStartingByte =
                 LogViewModel.CreateRelativeByteReference(0, CurrentFileComboBox.SelectedItem as string);
-            LogViewModel.BeginNewReadAtByteLocation(fileRelativeStartingByte, FindByteLocationActorMessages.SearchDirection.Backward, 1, true);
+            LogViewModel.BeginNewRead(fileRelativeStartingByte, FindByteLocationActorMessages.SearchDirection.Backward, 1, true);
         }
 
         private void DataGrid_SizeChanged(object sender, EventArgs e)

@@ -44,12 +44,27 @@ namespace LogReader.Akka.Net.Actors
             public long NumberOfLinesInLogFile { get; private set; }
             public string FilePathOfLogFile { get; private set; }
             public Action<string, long> UpdateMethod { get; private set; }
-
             public UpdateTotalLinesInLogFile(long numberOfLinesInLogFile, string filePathOfLogFile, Action<string, long> updateMethod)
             {
                 NumberOfLinesInLogFile = numberOfLinesInLogFile;
                 FilePathOfLogFile = filePathOfLogFile;
                 UpdateMethod = updateMethod;
+            }
+        }
+
+        public class LogSearchResult
+        {
+            public long ByteStartLocation { get; set; }
+            public string FilePathOfLogFile { get; set; }
+            public Action<string, long, byte[]> LogSearchResultAction { get; set; }
+            public byte[] ItemFound { get; set; }
+
+            public LogSearchResult(long byteStartLocation, string filePathOfLogFile, Action<string, long, byte[]> logSearchResultAction, byte[] itemFound)
+            {
+                ByteStartLocation = byteStartLocation;
+                FilePathOfLogFile = filePathOfLogFile;
+                LogSearchResultAction = logSearchResultAction;
+                ItemFound = itemFound;
             }
         }
     }
@@ -77,6 +92,11 @@ namespace LogReader.Akka.Net.Actors
                 case UpdateUIActorMessage.UpdateTotalLinesInLogFile byteCountInFile:
                 {
                     byteCountInFile.UpdateMethod.Invoke(byteCountInFile.FilePathOfLogFile, byteCountInFile.NumberOfLinesInLogFile);
+                    break;
+                }
+                case UpdateUIActorMessage.LogSearchResult resultMessage:
+                {
+                    resultMessage.LogSearchResultAction.Invoke(resultMessage.FilePathOfLogFile, resultMessage.ByteStartLocation, resultMessage.ItemFound);
                     break;
                 }
             }

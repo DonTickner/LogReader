@@ -23,7 +23,7 @@ namespace LogReader.Akka.Net.Actors
         /// <summary>
         /// A message that triggers a <see cref="FileByteLocationActor"/> to begin searching for a specific byte.
         /// </summary>
-        public class FindNumeredInstanceOfByteLocationInFile
+        public class FindNumberedInstanceOfByteLocationInFile
         {
             public long StartingByteNumber { get; private set; }
 
@@ -37,7 +37,7 @@ namespace LogReader.Akka.Net.Actors
 
             public bool OverrideUI { get; private set; }
 
-            public FindNumeredInstanceOfByteLocationInFile(long startingByte, byte byteToFind, SearchDirection searchDirection, string filePath, long instanceNumberToFind, bool overrideUI)
+            public FindNumberedInstanceOfByteLocationInFile(long startingByte, byte byteToFind, SearchDirection searchDirection, string filePath, long instanceNumberToFind, bool overrideUI)
             {
                 StartingByteNumber = startingByte;
                 ByteToFind = byteToFind;
@@ -51,7 +51,7 @@ namespace LogReader.Akka.Net.Actors
         /// <summary>
         /// A message that triggers a <see cref="FileByteLocationActor"/> to begin searching for a specific byte.
         /// </summary>
-        public class FindNumeredInstanceOfByteLocationInFileAndUpdateOnProgress
+        public class FindNumberedInstanceOfByteLocationInFileAndUpdateOnProgress
         {
             public long StartingByteNumber { get; private set; }
 
@@ -69,7 +69,7 @@ namespace LogReader.Akka.Net.Actors
 
             public Action<double> UpdateAction { get; private set; }
 
-            public FindNumeredInstanceOfByteLocationInFileAndUpdateOnProgress(long startingByte, byte byteToFind, SearchDirection searchDirection, string filePath, long instanceNumberToFind, bool overrideUI, IActorRef updateUIActor, Action<double> updateAction)
+            public FindNumberedInstanceOfByteLocationInFileAndUpdateOnProgress(long startingByte, byte byteToFind, SearchDirection searchDirection, string filePath, long instanceNumberToFind, bool overrideUI, IActorRef updateUIActor, Action<double> updateAction)
             {
                 StartingByteNumber = startingByte;
                 ByteToFind = byteToFind;
@@ -82,6 +82,9 @@ namespace LogReader.Akka.Net.Actors
             }
         }
 
+        /// <summary>
+        /// A message that triggers a <see cref="FindByteLocationActor"/> to being counting the number of occurrences of a byte within a file.
+        /// </summary>
         public class CountByteOccurrencesInFile
         {
             public byte ByteToFind { get; private set; }
@@ -98,6 +101,24 @@ namespace LogReader.Akka.Net.Actors
                 FilePath = filePath;
                 ActorToAdviseCountOf = actorToAdviseCountOf;
                 MethodToUpdateCount = methodToUpdateCount;
+            }
+        }
+
+        public class FindByteOccurrencesWithinAFile
+        {
+            public bool StopAfterSearch { get; set; }
+            public byte[] BytesToFind { get; set; }
+            public string FilePath { get; set; }
+            public IActorRef ActorToAdviseHitOf { get; set; }
+            public Action<string, long, byte[]> MethodToRegisterHit { get; set; }
+
+            public FindByteOccurrencesWithinAFile(byte[] bytesToFind, string filePath, IActorRef actorToAdviseHitOf, Action<string, long, byte[]> methodToRegisterHit, bool stopAfterSearch)
+            {
+                BytesToFind = bytesToFind;
+                FilePath = filePath;
+                ActorToAdviseHitOf = actorToAdviseHitOf;
+                MethodToRegisterHit = methodToRegisterHit;
+                StopAfterSearch = stopAfterSearch;
             }
         }
     }
@@ -120,21 +141,18 @@ namespace LogReader.Akka.Net.Actors
         {
             switch (message)
             {
-                case FindByteLocationActorMessages.FindNumeredInstanceOfByteLocationInFile findInstanceInFileMessage:
+                case FindByteLocationActorMessages.FindNumberedInstanceOfByteLocationInFile findInstanceInFileMessage:
                     {
-                        FindByteLocationActorMessages.FindNumeredInstanceOfByteLocationInFileAndUpdateOnProgress newMessage =
-                                new FindByteLocationActorMessages.FindNumeredInstanceOfByteLocationInFileAndUpdateOnProgress(findInstanceInFileMessage.StartingByteNumber, findInstanceInFileMessage.ByteToFind, findInstanceInFileMessage.SearchDirection, findInstanceInFileMessage.FilePath, findInstanceInFileMessage.InstanceNumberToFind, findInstanceInFileMessage.OverrideUI, null, null);
-
-                        long byteLocation = SearchForByteInFile(newMessage);
+                        long byteLocation = InitiateSearchForByteInFile(findInstanceInFileMessage);
                         if (byteLocation >= 0)
                         {
                             _readLineFromFileActor.Tell(new ReadLineFromFileActorMessages.ReadLineFromFileStartingAtByte(findInstanceInFileMessage.FilePath, byteLocation, findInstanceInFileMessage.OverrideUI));
                         }
                         break;
                     }
-                case FindByteLocationActorMessages.FindNumeredInstanceOfByteLocationInFileAndUpdateOnProgress findInstanceInFileMessage:
+                case FindByteLocationActorMessages.FindNumberedInstanceOfByteLocationInFileAndUpdateOnProgress findInstanceInFileMessage:
                     {
-                        long byteLocation = SearchForByteInFile(findInstanceInFileMessage);
+                        long byteLocation = InitiateSearchForByteInFile(findInstanceInFileMessage);
                         if (byteLocation >= 0)
                         {
                             _readLineFromFileActor.Tell(new ReadLineFromFileActorMessages.ReadLineFromFileStartingAtByte(findInstanceInFileMessage.FilePath, byteLocation, findInstanceInFileMessage.OverrideUI));
@@ -143,47 +161,64 @@ namespace LogReader.Akka.Net.Actors
                     }
                 case FindByteLocationActorMessages.CountByteOccurrencesInFile countByteMessage:
                     {
-                        long byteCount = CountBytesInFile(countByteMessage);
+                        long byteCount = CountByteOccurrencesInFile(countByteMessage);
                         countByteMessage.ActorToAdviseCountOf.Tell(new UpdateUIActorMessage.UpdateTotalLinesInLogFile(byteCount, countByteMessage.FilePath, countByteMessage.MethodToUpdateCount));
+                        break;
+                    }
+                case FindByteLocationActorMessages.FindByteOccurrencesWithinAFile searchByteMessage:
+                    {
+                        SearchByteBytesInFileAndAction(searchByteMessage.FilePath, searchByteMessage.BytesToFind, searchByteMessage.ActorToAdviseHitOf, searchByteMessage.MethodToRegisterHit);
+                        if (searchByteMessage.StopAfterSearch)
+                        {
+                            searchByteMessage.ActorToAdviseHitOf.Tell(PoisonPill.Instance);
+                        }
                         break;
                     }
             }
         }
 
-        /// <summary>
-        /// Processes a <see cref="FindByteLocationInFile"/> message.
-        /// </summary>
-        /// <param name="message">The <see cref="FindByteLocationInFile"/> message to process.</param>
-        private long SearchForByteInFile(FindByteLocationActorMessages.FindNumeredInstanceOfByteLocationInFileAndUpdateOnProgress message)
+        private long InitiateSearchForByteInFile(FindByteLocationActorMessages.FindNumberedInstanceOfByteLocationInFileAndUpdateOnProgress message)
         {
-            if (message.StartingByteNumber == 0
-                && message.SearchDirection == FindByteLocationActorMessages.SearchDirection.Backward)
+            return SearchForByteInFile(message.StartingByteNumber, message.SearchDirection, message.UpdateUIActor,
+                message.UpdateAction, message.FilePath, message.InstanceNumberToFind, message.ByteToFind);
+        }
+
+        private long InitiateSearchForByteInFile(FindByteLocationActorMessages.FindNumberedInstanceOfByteLocationInFile message)
+        {
+            return SearchForByteInFile(message.StartingByteNumber, message.SearchDirection, null, null,
+                message.FilePath, message.InstanceNumberToFind, message.ByteToFind);
+        }
+
+        private long SearchForByteInFile(long startingByteNumber, FindByteLocationActorMessages.SearchDirection searchDirection, IActorRef updateUIActor, Action<double> uiUpdateMethod, string pathOfFileToSearch, long numberOfByteInstancesToFind, byte byteToFind)
+        {
+            if (startingByteNumber == 0
+                && searchDirection == FindByteLocationActorMessages.SearchDirection.Backward)
             {
-                CompleteSearch(message.UpdateUIActor, message.UpdateAction);
+                CompleteSearch(updateUIActor, uiUpdateMethod);
                 return 0;
             }
 
-            string filePath = message.FilePath;
+            string filePath = pathOfFileToSearch;
             if (!File.Exists(filePath))
             {
                 return -1;
             }
 
-            if (message.InstanceNumberToFind == 0)
+            if (numberOfByteInstancesToFind == 0)
             {
-                CompleteSearch(message.UpdateUIActor, message.UpdateAction);
+                CompleteSearch(updateUIActor, uiUpdateMethod);
                 return 0;
             }
 
             long fileSizeInBytes = new FileInfo(filePath).Length;
 
-            long startingByte = message.StartingByteNumber;
-            long chunkStartingAtByte = message.StartingByteNumber;
-            int searchDirection = 1;
+            long startingByte = startingByteNumber;
+            long chunkStartingAtByte = startingByteNumber;
+            int searchDirectionInt = 1;
 
-            if (message.SearchDirection == FindByteLocationActorMessages.SearchDirection.Backward)
+            if (searchDirection == FindByteLocationActorMessages.SearchDirection.Backward)
             {
-                searchDirection = -1;
+                searchDirectionInt = -1;
                 chunkStartingAtByte = Math.Max(0, chunkStartingAtByte - ProgramConfig.ChunkSize);
                 startingByte = Math.Min(ProgramConfig.ChunkSize, startingByte) - 1;
             }
@@ -199,7 +234,7 @@ namespace LogReader.Akka.Net.Actors
 
             int numberFound = 0;
 
-            decimal numberOfLoops = message.InstanceNumberToFind + 1;
+            decimal numberOfLoops = numberOfByteInstancesToFind + 1;
             decimal uiUpdates = Math.Min(MaximumUIUpdates, numberOfLoops);
 
             decimal progressStep = (numberOfLoops) / uiUpdates;
@@ -209,7 +244,8 @@ namespace LogReader.Akka.Net.Actors
             using (FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
             {
                 while (chunkStartingAtByte < fileSizeInBytes
-                       && numberFound < message.InstanceNumberToFind)
+                       && chunkStartingAtByte >= 0
+                       && numberFound < numberOfByteInstancesToFind)
                 {
                     fileStream.Seek(Convert.ToInt32(chunkStartingAtByte), SeekOrigin.Begin);
 
@@ -217,10 +253,10 @@ namespace LogReader.Akka.Net.Actors
 
                     fileStream.Read(buffer, 0, (int)amountToRead);
 
-                    long byteLocation = SearchForByteInChunk(buffer, message.ByteToFind, searchDirection, startingByte);
+                    long byteLocation = SearchForByteInChunk(buffer, byteToFind, searchDirectionInt, startingByte);
                     bool byteFound = byteLocation > -1;
 
-                    startingByte = Math.Max(ProgramConfig.ChunkSize * -searchDirection, 0);
+                    startingByte = Math.Max(ProgramConfig.ChunkSize * -searchDirectionInt, 0);
                     if (byteFound)
                     {
                         numberFound += 1;
@@ -229,21 +265,25 @@ namespace LogReader.Akka.Net.Actors
                         if (progressToProgressStep >= progressStep)
                         {
                             progressToProgressStep = Math.Max(0, progressToProgressStep - progressStep);
-                            UpdateProgress(message.UpdateUIActor, message.UpdateAction, numberFound / numberOfLoops);
+                            UpdateProgress(updateUIActor, uiUpdateMethod, numberFound / numberOfLoops);
                         }
                     }
 
-                    if (numberFound >= message.InstanceNumberToFind)
+                    if (numberFound >= numberOfByteInstancesToFind)
                     {
-                        CompleteSearch(message.UpdateUIActor, message.UpdateAction);
+                        CompleteSearch(updateUIActor, uiUpdateMethod);
                         return chunkStartingAtByte + byteLocation + 1;
                     }
 
-                    chunkStartingAtByte = Math.Max(chunkStartingAtByte + (byteFound ? (byteLocation + 1) : amountToRead), 0);                                                          
+                    chunkStartingAtByte = (chunkStartingAtByte + (byteFound ? (byteLocation + 1) : amountToRead)) * searchDirectionInt;
+                    if (chunkStartingAtByte < 0)
+                    {
+                        return 0;
+                    }
                 }
             }
 
-            SearchError(message.UpdateUIActor, message.UpdateAction);
+            SearchError(updateUIActor, uiUpdateMethod);
             return -1;
         }
 
@@ -274,12 +314,12 @@ namespace LogReader.Akka.Net.Actors
         /// Counts the number of lines in the passed byte array
         /// </summary>
         /// <param name="bytesToRead">The byte array that represent a memory chunk</param>
-        private long CountBytesInChunk(byte[] bytesToRead, byte byteToFind)
+        private long CountByteOccurrencesInChunk(byte[] bytesToRead, byte byteToFind)
         {
             return bytesToRead.Sum(currentByte => currentByte == byteToFind ? 1 : 0);
         }
 
-        private long CountBytesInFile(FindByteLocationActorMessages.CountByteOccurrencesInFile message)
+        private long CountByteOccurrencesInFile(FindByteLocationActorMessages.CountByteOccurrencesInFile message)
         {
             string filePath = message.FilePath;
             byte byteToCount = message.ByteToFind;
@@ -302,7 +342,7 @@ namespace LogReader.Akka.Net.Actors
                     fileStream.Seek(Convert.ToInt32(chunkStartingAtByte), SeekOrigin.Begin);
                     long amountToRead = Math.Min(ProgramConfig.ChunkSize, fileSizeInBytes - chunkStartingAtByte);
                     fileStream.Read(buffer, 0, (int)amountToRead);
-                    numberFound += CountBytesInChunk(buffer, message.ByteToFind);
+                    numberFound += CountByteOccurrencesInChunk(buffer, message.ByteToFind);
                     chunkStartingAtByte = Math.Max(chunkStartingAtByte + amountToRead, 0);
                 }
             }
@@ -310,8 +350,111 @@ namespace LogReader.Akka.Net.Actors
             return numberFound;
         }
 
+        private long SearchForBytesInChunkAndActionResults(Action<string, long, byte[]> updateAction, string filePath, long chunkStartBytePos, byte[] bytesToSearch, long startingPosition, byte[] bytesToFind, IActorRef actorToReportResultTo, long indexOfFirstByteToFind = 0)
+        {
+            if (!bytesToFind.Any())
+            {
+                return 0;
+            }
+
+            long indexOfHitByte = indexOfFirstByteToFind;
+            byte firstByteToFind = bytesToFind[indexOfHitByte];
+
+            int loopEnd = bytesToSearch.Length;
+            int loopIncrement = 1;
+            int safeStartingPosition = (int)Math.Min(Math.Max(0, startingPosition), bytesToSearch.Length - 1);
+
+            bool hit = false;
+            long currentHitPosition = 0;
+            
+            for (long i = safeStartingPosition; i < loopEnd; i += loopIncrement)
+            {
+                hit = false;
+                currentHitPosition = 0;
+
+                if (bytesToSearch[i] != firstByteToFind)
+                {
+                    continue;
+                }
+
+                currentHitPosition = indexOfHitByte;
+                hit = true;
+                bool found = true;
+                
+                for (long nextByteToFind = indexOfHitByte + 1; nextByteToFind < bytesToFind.Length; nextByteToFind++)
+                {
+                    long nextByte = i + nextByteToFind;
+                    if (nextByte >= loopEnd)
+                    {
+                        found = false;
+                        i += bytesToFind.Length;
+                        break;
+                    }
+
+                    if (bytesToSearch[nextByte] == bytesToFind[nextByteToFind])
+                    {
+                        currentHitPosition = nextByteToFind;
+                        continue;
+                    }
+
+                    found = false;
+                    indexOfHitByte = 0;
+                    i += nextByteToFind;
+                    break;
+                }
+
+                if (!found)
+                {
+                    continue;
+                }
+
+                i += bytesToFind.Length - 1;
+                LogSearchResult(actorToReportResultTo,i + chunkStartBytePos, filePath, updateAction, bytesToFind);
+            }
+
+            return hit ? currentHitPosition : 0;
+        }
+
+        private void SearchByteBytesInFileAndAction(string pathOfFileToSearch, byte[] bytesToFind, IActorRef actorToReportSearchResultTo, Action<string, long, byte[]> updateAction)
+        {
+            string filePath = pathOfFileToSearch;
+
+            if (!File.Exists(filePath))
+            {
+                return;
+            }
+
+            long fileSizeInBytes = new FileInfo(filePath).Length;
+            long chunkStartingAtByte = 0;
+            byte[] buffer = new byte[ProgramConfig.ChunkSize];
+
+            using (FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+            {
+                long hitPosition = 0;
+
+                while (chunkStartingAtByte < fileSizeInBytes)
+                {
+                    fileStream.Seek(Convert.ToInt32(chunkStartingAtByte), SeekOrigin.Begin);
+                    long amountToRead = Math.Min(ProgramConfig.ChunkSize, fileSizeInBytes - chunkStartingAtByte);
+                    fileStream.Read(buffer, 0, (int)amountToRead);
+                    hitPosition = SearchForBytesInChunkAndActionResults(updateAction, filePath, chunkStartingAtByte, buffer, 0, bytesToFind, actorToReportSearchResultTo, hitPosition);
+                    chunkStartingAtByte = Math.Max(chunkStartingAtByte + amountToRead, 0);
+                }
+            }
+        }
+
+        private void LogSearchResult(IActorRef actorToReportSearchResultTo, long resultPosition, string filePath, Action<string, long, byte[]> updateAction, byte[] itemFound)
+        {
+            actorToReportSearchResultTo.Tell(new UpdateUIActorMessage.LogSearchResult(resultPosition, filePath, updateAction, itemFound));
+        }
+
         private void UpdateProgress(IActorRef actor, Action<double> updateAction, decimal percentageComplete)
         {
+            if (null == updateAction)
+            {
+                return;
+            }
+
             actor?.Tell(new UpdateUIActorMessage.UpdateProgressBar((double)percentageComplete, updateAction));
         }
 
@@ -322,7 +465,7 @@ namespace LogReader.Akka.Net.Actors
 
         private void SearchError(IActorRef actor, Action<double> updateAction)
         {
-            actor.Tell(new UpdateUIActorMessage.DisplayMessageBox("End of File exceeded. Unable to proceed.", "File Navigation Error", MessageBoxButton.OK, MessageBoxImage.Exclamation));
+            actor?.Tell(new UpdateUIActorMessage.DisplayMessageBox("End of File exceeded. Unable to proceed.", "File Navigation Error", MessageBoxButton.OK, MessageBoxImage.Exclamation));
             CompleteSearch(actor, updateAction);
         }
     }

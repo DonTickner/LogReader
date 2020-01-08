@@ -41,9 +41,15 @@
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto" MinHeight="20"/>
             </Grid.RowDefinitions>
-            <ListView x:Name="ResultsListView" Grid.Row="0" Grid.Column="0" Margin="10, 0, 10, 0" Grid.ColumnSpan="2"/>
+            <ListView x:Name="ResultsListView" 
+                      Grid.Row="0" 
+                      Grid.Column="0" 
+                      Margin="10, 0, 10, 0" 
+                      Grid.ColumnSpan="2"
+                      ItemsSource="{Binding SearchResultsView}"
+                      MouseDoubleClick="ResultsListView_OnMouseDoubleClick"/>
             <TextBlock x:Name="NumberOfResultsLabel" Grid.Row="1" Grid.Column="0" Text="Number of results: " Margin="10, 0, 0, 5" VerticalAlignment="Center"/>
-            <TextBlock x:Name="NumberOfResultsTextLabel" Grid.Row="1" Grid.Column="1" Text="0" Margin="5, 0, 10, 5" VerticalAlignment="Center"/>
+            <TextBlock x:Name="NumberOfResultsTextLabel" Grid.Row="1" Grid.Column="1" Text="{Binding NumberOfSearchResults}" Margin="5, 0, 10, 5" VerticalAlignment="Center"/>
         </Grid>
     </Grid>
 </Window>

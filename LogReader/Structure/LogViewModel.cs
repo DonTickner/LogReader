@@ -5,7 +5,9 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Windows;
+using System.Windows.Data;
 using Akka.Actor;
 using Akka.Configuration;
 using Log4Net.Extensions.Configuration.Implementation;
@@ -150,6 +152,22 @@ namespace LogReader.Structure
         }
 
         #endregion
+
+        #region Search
+
+        private List<SearchResult> _searchResults;
+        private ICollectionView _searchResultView;
+        public ICollectionView SearchResultsView
+        {
+            get { return _searchResultView; }
+        }
+
+        public long NumberOfSearchResults
+        {
+            get { return _searchResults.Count; }
+        }
+
+        #endregion
         
         #region UI
 
@@ -248,11 +266,15 @@ namespace LogReader.Structure
         {
             LogLines = new ObservableCollection<LogLine>();
             _logFiles = new List<LogFileInfo>();
+            _searchResults = new List<SearchResult>();
+
             FileControlVisibility = Visibility.Collapsed;
             SetupAkkaActorSystem();
         }
 
         #endregion
+
+        #region Methods
 
         #region Akka.Net Methods
 
@@ -277,12 +299,12 @@ namespace LogReader.Structure
             _findStartingByteActor = _akkaActorSystem.ActorOf(findStartingByteLocationActorProps, $"findStartingByteLocation_{Guid.NewGuid()}");
         }
 
-        public void BeginNewReadAtByteLocation(long startingByte,
+        public void BeginNewRead(long startingByte,
             FindByteLocationActorMessages.SearchDirection searchDirection, int numberOfInstancesToFind, bool overrideUI = false)
         {
             InitiateNewRead();
             _findStartingByteActor.Tell(
-                new FindByteLocationActorMessages.FindNumeredInstanceOfByteLocationInFile(
+                new FindByteLocationActorMessages.FindNumberedInstanceOfByteLocationInFile(
                     TranslateRelativeBytePosition(startingByte),
                     ProgramConfig.LineFeedByte,
                     searchDirection,
@@ -291,23 +313,40 @@ namespace LogReader.Structure
                     overrideUI));
         }
 
-        public void BeginReadAtNewSpecificByteIndexLocation(FindByteLocationActorMessages.SearchDirection searchDirection, long numberOfInstancesToFind, string file, bool overrideUI = false)
+        /// <summary>
+        /// Begins a new Log File Read from a specific occurrence of a byte within the file.
+        /// </summary>
+        /// <param name="byteToFind">The <see cref="byte"/> whose occurrence triggers the read.</param>
+        /// <param name="occurrenceToReadFrom">The numbered occurrence of the <see cref="byte"/> to begin reading from.</param>
+        /// <param name="file">The log file we want to read from.</param>
+        /// <param name="updateAction">The <see cref="Action"/> to perform as we progress towards the read.</param>
+        public void BeginNewReadAtByteOccurrenceNumber(long occurrenceToReadFrom, string file, Action<double> updateAction)
         {
-            BeginReadAtNewSpecificByteIndexLocationAndUpdate(searchDirection, numberOfInstancesToFind, file, overrideUI, null);
+            TriggerNewLogFileRead(0, ProgramConfig.LineFeedByte, FindByteLocationActorMessages.SearchDirection.Forward, file, occurrenceToReadFrom, true, _updateUIActor, updateAction);
         }
 
-        public void BeginReadAtNewSpecificByteIndexLocationAndUpdate(FindByteLocationActorMessages.SearchDirection searchDirection, long numberOfInstancesToFind, string file, bool overrideUI, Action<double> updateAction)
+        /// <summary>
+        /// Begins a new Log File read from a specific file at a specific byte location.
+        /// </summary>
+        /// <param name="startingByte">The byte location within the log file to begin reading from.</param>
+        /// <param name="filePath">The file path of the log file to read from.</param>
+        public void BeginNewReadInSpecificFileAtByteLocation(long startingByte, string filePath)
+        {
+            TriggerNewLogFileRead(startingByte, ProgramConfig.LineFeedByte, FindByteLocationActorMessages.SearchDirection.Backward, filePath, 1, true, null, null);
+        }
+
+        private void TriggerNewLogFileRead(long startingByte, byte byteToFind, FindByteLocationActorMessages.SearchDirection searchDirection, string filePath, long numberOfInstancesToFind, bool updateUi, IActorRef updateActorRef, Action<double> updateAction)
         {
             InitiateNewRead();
             _findStartingByteActor.Tell(
-                new FindByteLocationActorMessages.FindNumeredInstanceOfByteLocationInFileAndUpdateOnProgress(
-                    0,
-                    ProgramConfig.LineFeedByte,
+                new FindByteLocationActorMessages.FindNumberedInstanceOfByteLocationInFileAndUpdateOnProgress(
+                    startingByte,
+                    byteToFind,
                     searchDirection,
-                    file,
+                    filePath,
                     numberOfInstancesToFind,
-                    overrideUI,
-                    _updateUIActor,
+                    updateUi,
+                    updateActorRef,
                     updateAction));
         }
 
@@ -323,7 +362,7 @@ namespace LogReader.Structure
             FindByteLocationActorMessages.SearchDirection searchDirection, int numberOfInstancesToFind, bool overrideUI = false)
         {
             _findStartingByteActor.Tell(
-                new FindByteLocationActorMessages.FindNumeredInstanceOfByteLocationInFile(
+                new FindByteLocationActorMessages.FindNumberedInstanceOfByteLocationInFile(
                     TranslateRelativeBytePosition(startingByte),
                     ProgramConfig.LineFeedByte,
                     searchDirection,
@@ -584,6 +623,8 @@ namespace LogReader.Structure
 
             CreateLogFiles(logFileLocations);
 
+            ReadLine(0);
+
             foreach (LogFileInfo logFileInfo in LogFiles)
             {
                 Props updateUIActorProps = Props.Create(() => new UpdateUIActor()).WithDispatcher("akka.actor.synchronized-dispatcher");
@@ -596,5 +637,46 @@ namespace LogReader.Structure
                 findStartingByteActor.Tell(PoisonPill.Instance);
             }
         }
+
+        public void CreateNewSearchResult(string filePath, long byteStartLocation, byte[] itemFound)
+        {
+            _searchResults.Add(new SearchResult(byteStartLocation, filePath, itemFound));
+
+            _searchResultView = CollectionViewSource.GetDefaultView(_searchResults.OrderByDescending(r => r.LogFilePath).ThenBy(r => r.ByteStartingPosition));
+
+            OnPropertyChanged(nameof(NumberOfSearchResults));
+            OnPropertyChanged(nameof(SearchResultsView));
+        }
+
+        public void BeginSearch(string stringToFind, bool currentFileOnly)
+        {
+            byte[] bytesToFind = Encoding.ASCII.GetBytes(stringToFind);
+            _searchResults.Clear();
+
+            if (currentFileOnly)
+            {
+                TriggerFileSearch(bytesToFind, CurrentLogFile, true);
+                return;
+            }
+
+            foreach (LogFileInfo logFileInfo in LogFiles)
+            {
+                TriggerFileSearch(bytesToFind, logFileInfo.FileLocation, true);
+            }
+        }
+
+        private void TriggerFileSearch(byte[] bytesToFind, string filePath, bool stopActorAfterSearch)
+        {
+            Props updateUIActorProps = Props.Create(() => new UpdateUIActor()).WithDispatcher("akka.actor.synchronized-dispatcher");
+            IActorRef updateUIActor = _akkaActorSystem.ActorOf(updateUIActorProps, $"updateUI_{Guid.NewGuid()}");
+
+            Props findStartingByteLocationActorProps = Props.Create(() => new FindByteLocationActor(null));
+            IActorRef findStartingByteActor = _akkaActorSystem.ActorOf(findStartingByteLocationActorProps, $"findStartingByteLocation_{Guid.NewGuid()}");
+
+            findStartingByteActor.Tell(new FindByteLocationActorMessages.FindByteOccurrencesWithinAFile(bytesToFind, filePath, updateUIActor, CreateNewSearchResult, stopActorAfterSearch));
+            findStartingByteActor.Tell(PoisonPill.Instance);
+        }
+
+        #endregion
     }
 }
