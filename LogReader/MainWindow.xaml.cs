@@ -115,7 +115,7 @@ namespace LogReader
                     overrideUI = true;
                 }                                                                                                                                                                                  
 
-                LogViewModel.BeginNewRead(startingByte, FindByteLocationActorMessages.SearchDirection.Backward, numberOfInstancesToFind, overrideUI);
+                LogViewModel.ReadLinesStartingFromBytePosition(startingByte, numberOfInstancesToFind, overrideUI);
             }
         }
 
@@ -243,9 +243,7 @@ namespace LogReader
                 return;
             }
 
-            long fileRelativeStartingByte =
-                LogViewModel.CreateRelativeByteReference(0, CurrentFileComboBox.SelectedItem as string);
-            LogViewModel.BeginNewRead(fileRelativeStartingByte, FindByteLocationActorMessages.SearchDirection.Backward, 1, true);
+            LogViewModel.BeginNewReadInSpecificFileAtByteLocation(0, CurrentFileComboBox.SelectedItem as string);
         }
 
         private void DataGrid_SizeChanged(object sender, EventArgs e)
@@ -278,9 +276,6 @@ namespace LogReader
             bool rawView = RawToggleButton.IsChecked ?? false;
 
             LogViewModel.RawDisplayMode = rawView;
-
-            var test = Lines;
-            var test2 = LineTextBox;
         }
 
         private void SearchCommand_OnCanExecute(object sender, CanExecuteRoutedEventArgs e)
@@ -292,6 +287,23 @@ namespace LogReader
         {
             SearchDialog searchDialog = new SearchDialog(LogViewModel);
             searchDialog.Show();
+        }
+
+        private void SeamlessScroll_OnChecked(object sender, RoutedEventArgs e)
+        {
+            if (null == LogViewModel)
+            {
+                return;
+            }
+
+            if (!LogViewModel.HasLoaded)
+            {
+                return;
+            }
+
+            bool seamlessScroll = SeamlessScroll.IsChecked ?? false;
+
+            LogViewModel.SeamlessScroll = seamlessScroll;
         }
     }
 }

@@ -89,6 +89,14 @@ namespace LogReader.Structure
             get { return _logFiles.Sum(l => l.FileSizeInByte); }
         }
 
+        /// <summary>
+        /// The size of the current Log File.
+        /// </summary>
+        public long CurrentLogFileSizeInBytes
+        {
+            get { return _logFiles.Where(l => l.FileLocation == CurrentLogFile).Sum(l => l.FileSizeInByte); }
+        }
+
         #endregion
 
         #region Log Lines
@@ -176,7 +184,15 @@ namespace LogReader.Structure
         /// </summary>
         public long CalculatedScrollableMaximum
         {
-            get { return TotalFileSizesInBytes / 10; }
+            get
+            {
+                if (!_seamlessScroll)
+                {
+                    return CurrentLogFileSizeInBytes / 10;
+                }
+
+                return TotalFileSizesInBytes / 10;
+            }
         }
 
         /// <summary>
@@ -258,6 +274,27 @@ namespace LogReader.Structure
             }
         }
 
+        private bool _seamlessScroll;
+        public bool SeamlessScroll
+        {
+            get { return _seamlessScroll; }
+            set
+            {
+                _seamlessScroll = value;
+                OnPropertyChanged(nameof(SeamlessScroll));
+                OnPropertyChanged(nameof(CalculatedScrollableMaximum));
+
+                if (!_seamlessScroll)
+                {
+                    CurrentScrollPosition = TranslateRelativeBytePosition(CurrentScrollPosition * 10) / 10;
+                }
+                else
+                {
+                    CurrentScrollPosition = CreateRelativeByteReference(CurrentScrollPosition * 10, CurrentLogFile) / 10;
+                }
+            }
+        }
+
         #endregion
         
         #region Constructor
@@ -267,6 +304,7 @@ namespace LogReader.Structure
             LogLines = new ObservableCollection<LogLine>();
             _logFiles = new List<LogFileInfo>();
             _searchResults = new List<SearchResult>();
+            _seamlessScroll = true;
 
             FileControlVisibility = Visibility.Collapsed;
             SetupAkkaActorSystem();
@@ -299,18 +337,14 @@ namespace LogReader.Structure
             _findStartingByteActor = _akkaActorSystem.ActorOf(findStartingByteLocationActorProps, $"findStartingByteLocation_{Guid.NewGuid()}");
         }
 
-        public void BeginNewRead(long startingByte,
-            FindByteLocationActorMessages.SearchDirection searchDirection, int numberOfInstancesToFind, bool overrideUI = false)
+        public void ReadLinesStartingFromBytePosition(long startingByte, int numberOfInstancesToFind, bool overrideUI = false)
         {
             InitiateNewRead();
-            _findStartingByteActor.Tell(
-                new FindByteLocationActorMessages.FindNumberedInstanceOfByteLocationInFile(
-                    TranslateRelativeBytePosition(startingByte),
-                    ProgramConfig.LineFeedByte,
-                    searchDirection,
-                    LocateLogFileFromByteReference(startingByte),
-                    numberOfInstancesToFind,
-                    overrideUI));
+
+            long byteToReadFrom = SeamlessScroll ? TranslateRelativeBytePosition(startingByte) : startingByte;
+            string fileToReadFrom = SeamlessScroll ? LocateLogFileFromByteReference(startingByte) : CurrentLogFile;
+
+            TriggerNewLogFileRead(byteToReadFrom, ProgramConfig.LineFeedByte, FindByteLocationActorMessages.SearchDirection.Backward, fileToReadFrom, numberOfInstancesToFind, overrideUI, null, null);
         }
 
         /// <summary>
@@ -384,21 +418,7 @@ namespace LogReader.Structure
                 return;
             }
 
-            if (!ExpandingView)
-            {
-                int zeroBasedLogLineIndex = Math.Max(0, _currentLineToUpdate - 1);
-
-                if (zeroBasedLogLineIndex < _logLines.Count)
-                {
-                    _logLines[zeroBasedLogLineIndex] = CreateNewLogLine(lineToAdd);
-                    CurrentLogFile = lineToAdd.FilePath;
-                }
-            }
-            else
-            { 
-                _logLines.Add(CreateNewLogLine(lineToAdd));
-                CurrentLogFile = lineToAdd.FilePath;
-            }
+            UpdateLogLinesWithNewLine(lineToAdd);
 
             _currentLineToUpdate++;
             OnPropertyChanged(nameof(_currentLineToUpdate));
@@ -413,12 +433,62 @@ namespace LogReader.Structure
             }
         }
 
+        private void UpdateLogLinesWithNewLine(ReadLineFromFileActor.ReturnedLine lineToAdd)
+        {
+            if (!ExpandingView)
+            {
+                int zeroBasedLogLineIndex = Math.Max(0, _currentLineToUpdate - 1);
+
+                if (zeroBasedLogLineIndex < _logLines.Count)
+                {
+                    if (!SeamlessScroll)
+                    {
+                        if (lineToAdd.FilePath == CurrentLogFile)
+                        {
+                            _logLines[zeroBasedLogLineIndex] = CreateNewLogLine(lineToAdd);
+                        }
+                        else
+                        {
+                            ReadLineFromFileActor.ReturnedLine lastLine = new ReadLineFromFileActor.ReturnedLine
+                            {
+                                LineStartsAtByteLocation = _logLines[zeroBasedLogLineIndex - 1].StartingByte,
+                                LineEndsAtByteLocation = _logLines[zeroBasedLogLineIndex - 1].EndingByte,
+                                FilePath = CurrentLogFile,
+                                Line = ""
+                            };
+
+                            _logLines[zeroBasedLogLineIndex] = CreateNewLogLine(lastLine);
+                        }
+                    }
+                    else
+                    {
+                        _logLines[zeroBasedLogLineIndex] = CreateNewLogLine(lineToAdd);
+                    }
+                }
+            }
+            else
+            {
+                if (!SeamlessScroll)
+                {
+                    if (lineToAdd.FilePath == CurrentLogFile)
+                    {
+                        _logLines.Add(CreateNewLogLine(lineToAdd));
+                    }
+                }
+                else
+                {
+                    _logLines.Add(CreateNewLogLine(lineToAdd));
+                }
+            }
+        }
+
         /// <summary>
         /// Creates a new <see cref="LogLine"/> based on the content of a <see cref="ReadLineFromFileActor.ReturnedLine"/>.
         /// </summary>
         /// <param name="line">The <see cref="ReadLineFromFileActor.ReturnedLine"/> to construct the <see cref="LogLine"/>.</param>
         private LogLine CreateNewLogLine(ReadLineFromFileActor.ReturnedLine line)
         {
+            CurrentLogFile = line.FilePath;
             return new LogLine
             {
                 Line = line.Line,
@@ -623,19 +693,17 @@ namespace LogReader.Structure
 
             CreateLogFiles(logFileLocations);
 
-            ReadLine(0);
+            ReadLinesStartingFromBytePosition(0, 1);
+
+            Props findStartingByteLocationActorProps = Props.Create(() => new FindByteLocationActor(null));
+            IActorRef findStartingByteActor = _akkaActorSystem.ActorOf(findStartingByteLocationActorProps, $"findStartingByteLocation_{Guid.NewGuid()}");
 
             foreach (LogFileInfo logFileInfo in LogFiles)
             {
-                Props updateUIActorProps = Props.Create(() => new UpdateUIActor()).WithDispatcher("akka.actor.synchronized-dispatcher");
-                IActorRef updateUIActor = _akkaActorSystem.ActorOf(updateUIActorProps, $"updateUI_{Guid.NewGuid()}");
-
-                Props findStartingByteLocationActorProps = Props.Create(() => new FindByteLocationActor(null));
-                IActorRef findStartingByteActor = _akkaActorSystem.ActorOf(findStartingByteLocationActorProps, $"findStartingByteLocation_{Guid.NewGuid()}");
-
-                findStartingByteActor.Tell(new FindByteLocationActorMessages.CountByteOccurrencesInFile(ProgramConfig.LineFeedByte, logFileInfo.FileLocation, updateUIActor, SetLogFileLineCount));
-                findStartingByteActor.Tell(PoisonPill.Instance);
+                findStartingByteActor.Tell(new FindByteLocationActorMessages.CountByteOccurrencesInFile(ProgramConfig.LineFeedByte, logFileInfo.FileLocation, _updateUIActor, SetLogFileLineCount));
             }
+
+            findStartingByteActor.Tell(PoisonPill.Instance);
         }
 
         public void CreateNewSearchResult(string filePath, long byteStartLocation, byte[] itemFound)

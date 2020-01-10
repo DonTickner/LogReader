@@ -41,17 +41,33 @@
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
-        <ToggleButton x:Name="RawToggleButton"
-                      Grid.Column="1"
-                      Grid.Row="1"
-                      Height="22"
-                      Margin="2,2,2,2"
-                      Content="Raw"
-                      Width="50"
-                      HorizontalAlignment="Left"
-                      Checked="RawToggleButton_OnCheckChanged"
-                      Unchecked="RawToggleButton_OnCheckChanged"
-                      Visibility="{Binding FileControlVisibility}"/>
+        <Grid Grid.Column="1" Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <ToggleButton x:Name="RawToggleButton"
+                          Grid.Column="0"
+                          Height="22"
+                          Margin="2,2,2,2"
+                          Content="Raw"
+                          Width="Auto"
+                          HorizontalAlignment="Left"
+                          Checked="RawToggleButton_OnCheckChanged"
+                          Unchecked="RawToggleButton_OnCheckChanged"
+                          Visibility="{Binding FileControlVisibility}"/>
+            <ToggleButton x:Name="SeamlessScroll"
+                          Grid.Column="1"
+                          Height="22"
+                          Margin="2,2,2,2"
+                          Content="Seamless"
+                          Width="Auto"
+                          HorizontalAlignment="Left"
+                          Checked="SeamlessScroll_OnChecked"
+                          Unchecked="SeamlessScroll_OnChecked"
+                          IsChecked="True"
+                          Visibility="{Binding FileControlVisibility}"/>
+        </Grid>
         <TextBox x:Name="LineTextBox"
                  Grid.Column="1"
                  Grid.ColumnSpan="2"
