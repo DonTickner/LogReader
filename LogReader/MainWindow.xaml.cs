@@ -95,27 +95,27 @@ namespace LogReader
                 return;
             }
 
-            if (e.ScrollEventType == ScrollEventType.SmallIncrement)
+            switch (e.ScrollEventType)
             {
-                LogViewModel.ReadLine(LogViewModel.FirstLineEndingByte, true);
-            }
-            else
-            {
-                int numberOfInstancesToFind = e.ScrollEventType == ScrollEventType.SmallDecrement ? 2 : 1;
-                bool overrideUI = false;
-                long startingByte = LogViewModel.FirstLineStartingByte;
-
-                if (e.ScrollEventType != ScrollEventType.SmallDecrement)
+                case ScrollEventType.SmallIncrement:
                 {
-                    startingByte =
-                        Math.Max(0, Math.Min(LogViewModel.TotalFileSizesInBytes, (long)(e.NewValue * 10)));
+                    LogViewModel.ReadLinesStartingFromBytePosition(LogViewModel.FirstLineEndingByte, 1, true);
+                    break;
                 }
-                else
+                case ScrollEventType.SmallDecrement:
                 {
-                    overrideUI = true;
-                }                                                                                                                                                                                  
-
-                LogViewModel.ReadLinesStartingFromBytePosition(startingByte, numberOfInstancesToFind, overrideUI);
+                    LogViewModel.BeginNewReadAtByteOccuranceNumberStartingFromSpecificByteReferemce(LogViewModel.FirstLineStartingByte
+                        , FindByteLocationActorMessages.SearchDirection.Backward
+                        , 2,
+                        true);
+                    break;
+                }
+                default:
+                {
+                    long startingByte = Math.Max(0, Math.Min(LogViewModel.TotalFileSizesInBytes, (long)(e.NewValue * 10)));
+                    LogViewModel.ReadLinesStartingFromBytePosition(startingByte, 1, false);
+                    break;
+                }
             }
         }
 

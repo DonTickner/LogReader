@@ -212,22 +212,13 @@ namespace LogReader.Akka.Net.Actors
 
             long fileSizeInBytes = new FileInfo(filePath).Length;
 
-            long startingByte = startingByteNumber;
             long chunkStartingAtByte = startingByteNumber;
             int searchDirectionInt = 1;
 
             if (searchDirection == FindByteLocationActorMessages.SearchDirection.Backward)
             {
                 searchDirectionInt = -1;
-                chunkStartingAtByte = Math.Max(0, chunkStartingAtByte - ProgramConfig.ChunkSize);
-                startingByte = Math.Min(ProgramConfig.ChunkSize, startingByte) - 1;
-            }
-            else
-            {
-                if (startingByte > ProgramConfig.ChunkSize)
-                {
-                    startingByte = startingByte % ProgramConfig.ChunkSize;
-                }
+                chunkStartingAtByte = chunkStartingAtByte - ProgramConfig.ChunkSize;
             }
 
             byte[] buffer = new byte[ProgramConfig.ChunkSize];
@@ -240,23 +231,38 @@ namespace LogReader.Akka.Net.Actors
             decimal progressStep = (numberOfLoops) / uiUpdates;
 
             decimal progressToProgressStep = progressStep;
+            long amountToRead = ProgramConfig.ChunkSize;
 
             using (FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
             {
                 while (chunkStartingAtByte < fileSizeInBytes
-                       && chunkStartingAtByte >= 0
                        && numberFound < numberOfByteInstancesToFind)
                 {
+
+                    long startingByte = Math.Max(ProgramConfig.ChunkSize * -searchDirectionInt, 0);
+
+                    if (searchDirectionInt > 0)
+                    {
+                        amountToRead = Math.Min(ProgramConfig.ChunkSize, fileSizeInBytes - chunkStartingAtByte);
+                    }
+                    else
+                    {
+                        amountToRead = Math.Min(amountToRead + chunkStartingAtByte, ProgramConfig.ChunkSize);
+                        chunkStartingAtByte = Math.Max(chunkStartingAtByte, 0);
+                        startingByte = amountToRead;
+                    }
+
+                    if (amountToRead <= 0)
+                    {
+                        return 0;
+                    }
+
                     fileStream.Seek(Convert.ToInt32(chunkStartingAtByte), SeekOrigin.Begin);
-
-                    long amountToRead = Math.Min(ProgramConfig.ChunkSize, fileSizeInBytes - chunkStartingAtByte);
-
                     fileStream.Read(buffer, 0, (int)amountToRead);
 
                     long byteLocation = SearchForByteInChunk(buffer, byteToFind, searchDirectionInt, startingByte);
                     bool byteFound = byteLocation > -1;
 
-                    startingByte = Math.Max(ProgramConfig.ChunkSize * -searchDirectionInt, 0);
                     if (byteFound)
                     {
                         numberFound += 1;
@@ -268,6 +274,14 @@ namespace LogReader.Akka.Net.Actors
                             UpdateProgress(updateUIActor, uiUpdateMethod, numberFound / numberOfLoops);
                         }
                     }
+                    else if (searchDirectionInt < 0)
+                    {
+                        if (chunkStartingAtByte - amountToRead <= 0)
+                        {
+                            return 0;
+                        }
+
+                    }
 
                     if (numberFound >= numberOfByteInstancesToFind)
                     {
@@ -275,10 +289,14 @@ namespace LogReader.Akka.Net.Actors
                         return chunkStartingAtByte + byteLocation + 1;
                     }
 
-                    chunkStartingAtByte = (chunkStartingAtByte + (byteFound ? (byteLocation + 1) : amountToRead)) * searchDirectionInt;
-                    if (chunkStartingAtByte < 0)
+                    if (searchDirectionInt > 0)
                     {
-                        return 0;
+                        chunkStartingAtByte = chunkStartingAtByte + (byteFound ? byteLocation + 1 : amountToRead);
+                    }
+                    else
+                    {
+                        chunkStartingAtByte = chunkStartingAtByte + (byteFound ? byteLocation - 1 - amountToRead
+                            : amountToRead);
                     }
                 }
             }

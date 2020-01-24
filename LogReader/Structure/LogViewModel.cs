@@ -337,6 +337,23 @@ namespace LogReader.Structure
             _findStartingByteActor = _akkaActorSystem.ActorOf(findStartingByteLocationActorProps, $"findStartingByteLocation_{Guid.NewGuid()}");
         }
 
+        public void BeginNewReadAtByteOccuranceNumberStartingFromSpecificByteReferemce(long startingByte, FindByteLocationActorMessages.SearchDirection searchDirection, long instanceNumberToStartFrom, bool updateUi)
+        {
+            long byteToReadFrom = SeamlessScroll ? TranslateRelativeBytePosition(startingByte) : startingByte;
+            string fileToReadFrom = SeamlessScroll ? LocateLogFileFromByteReference(startingByte) : CurrentLogFile;
+
+            TriggerNewLogFileRead(
+                byteToReadFrom
+                , ProgramConfig.LineFeedByte
+                , searchDirection
+                , fileToReadFrom
+                , instanceNumberToStartFrom
+                , updateUi
+                , null
+                , null
+                );
+        }
+
         public void ReadLinesStartingFromBytePosition(long startingByte, int numberOfInstancesToFind, bool overrideUI = false)
         {
             InitiateNewRead();
@@ -383,15 +400,7 @@ namespace LogReader.Structure
                     updateActorRef,
                     updateAction));
         }
-
-        public void ReadLine(long startingByte, bool overrideUi = false)
-        {
-            InitiateNewRead();
-            _readLineFromFileActor.Tell(new ReadLineFromFileActorMessages.ReadLineFromFileStartingAtByte(
-                LocateLogFileFromByteReference(startingByte), TranslateRelativeBytePosition(startingByte),
-                overrideUi));
-        }
-
+        
         public void ContinueReadFromByteLocation(long startingByte,
             FindByteLocationActorMessages.SearchDirection searchDirection, int numberOfInstancesToFind, bool overrideUI = false)
         {
