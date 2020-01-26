@@ -4,9 +4,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Log4Net.Extensions.Configuration.Exceptions;
 using Log4Net.Extensions.Configuration.Implementation.ConfigObjects;
+using Log4Net.Extensions.Configuration.Implementation.LogObjects;
 
 namespace Log4Net.Extensions.Configuration.Implementation
 {
@@ -339,7 +341,7 @@ namespace Log4Net.Extensions.Configuration.Implementation
         }
 
         /// <summary>
-        /// Creates a <see cref="AppenderConversionPattern"/> based on the content of the <see cref="Appender"/>'s <see cref="XElement"/>.
+        /// Creates a fully detailed <see cref="AppenderConversionPattern"/> based on the content of the <see cref="Appender"/>'s <see cref="XElement"/>.
         /// </summary>
         /// <param name="appenderElement">The <see cref="XElement"/> that represents an appender element.</param>
         private static AppenderConversionPattern LoadAppenderConversionPatternFromElement(XElement appenderElement)
@@ -356,90 +358,128 @@ namespace Log4Net.Extensions.Configuration.Implementation
 
             AppenderConversionPattern newAppenderConversionPattern = new AppenderConversionPattern()
             {
-                RawLine = conversionPattern
+                RawLine = conversionPattern,
+                Delimiter = " "
             };
 
-            int numberOfFieldsBeforeMessage = 0;
-            bool foundMessage = false;
+            List<LogLineField> fields = GenerateFieldsFromConversionPattern(conversionPattern);
+            newAppenderConversionPattern.Fields = fields;
+            newAppenderConversionPattern.NumberOfFieldsBeforeMessageField = fields.Count - 1;
 
-            for (int i = 0; i < conversionPattern.Length - 1; i++)
+            return newAppenderConversionPattern;
+        }
+
+        /// <summary>
+        /// Receives the raw conversion pattern from the Log4Net config file, and generates the necessary <see cref="LogLineField"/> information.
+        /// </summary>
+        /// <param name="rawConversionPattern">The raw conversion pattern string.</param>
+        private static List<LogLineField> GenerateFieldsFromConversionPattern(string rawConversionPattern)
+        {
+            List<LogLineField> newFields = new List<LogLineField>();
+
+            List<string> fieldPatterns = new List<string>();
+
+            int startPos = 0;
+            bool inField = false;
+
+            for (int i = 0; i < rawConversionPattern.Length; i++)
             {
-                if (!conversionPattern[i].Equals('%'))
+                if ((rawConversionPattern[i] == ' ' || i == rawConversionPattern.Length - 1)
+                    && inField)
+                {
+                    fieldPatterns.Add(rawConversionPattern.Substring(startPos, i - startPos).Trim());
+                    inField = false;
+                    continue;
+                }
+
+                if (rawConversionPattern[i] != '%')
                 {
                     continue;
                 }
 
-                if (conversionPattern[i + 1].Equals('%'))
+                if (inField)
                 {
-                    i += 2;
-                    continue;
+                    fieldPatterns.Add(rawConversionPattern.Substring(startPos, i - startPos).Trim());
+                    inField = false;
                 }
 
-                string currentField = string.Empty;
-                bool innerOpen = false;
-                for (int x = i + 1; x < conversionPattern.Length; x++)
+                startPos = i;
+                inField = true;
+            }
+
+            foreach (string pattern in fieldPatterns)
+            {
+                string cleanedPattern = PatternLayout.CleanConversionPatternField(pattern);
+
+                bool inPadding = false;
+                bool inTruncate = false;
+
+                string paddingElement = string.Empty;
+                string truncateElement = string.Empty;
+                string patternElement = string.Empty;
+
+                foreach (char c in cleanedPattern)
                 {
-                    if (char.IsDigit(conversionPattern[x]))
+                    if (c == '.')
                     {
+                        inPadding = false;
+                        inTruncate = true;
                         continue;
                     }
 
-                    currentField += conversionPattern[x];
-
-                    if (string.Equals(currentField, "m", StringComparison.InvariantCulture))
+                    if (Char.IsDigit(c))
                     {
-                        foundMessage = true;
-                        break;
-                    }
-
-                    if (conversionPattern[x].Equals('{'))
-                    {
-                        innerOpen = true;
-                        continue;
-                    }
-
-                    if (conversionPattern[x].Equals(' ') &&
-                        !innerOpen)
-                    {
-                        currentField = currentField.Substring(0, currentField.Length - 1);
-
-                        if (string.Equals(currentField, "d") ||
-                            string.Equals(currentField, "date"))
+                        if (!inTruncate)
                         {
-                            numberOfFieldsBeforeMessage++;
-                        }
-
-                        if (currentField[0].Equals('d') &&
-                            currentField.Contains("{"))
-                        {
-                            int spaces = currentField.Count(c => c.Equals(' '));
-                            numberOfFieldsBeforeMessage += spaces;
+                            inPadding = true;
                         }
                         else
                         {
-                            numberOfFieldsBeforeMessage++;
+                            truncateElement += c;
                         }
 
-                        i = x;
-                        break;
+                        if (inPadding)
+                        {
+                            paddingElement += c;
+                        }
+
+                        continue;
                     }
 
-                    if (conversionPattern[x].Equals('}'))
-                    {
-                        innerOpen = false;
-                    }
+                    inPadding = inTruncate = false;
+                    patternElement += c;
                 }
 
-                if (foundMessage)
+                if (string.IsNullOrEmpty(patternElement))
                 {
-                    break;
+                    continue;
                 }
+
+                LogLineField newField = new LogLineField
+                {
+                    Name = PatternLayout.RetrieveFieldNameFromConversionPattern(patternElement)
+                };
+
+                if (!string.IsNullOrEmpty(truncateElement))
+                {
+                    newField.Type = LogLineType.FixedWidth;
+                    newField.FixedWidth = long.Parse(truncateElement);
+                }
+                else
+                {
+                    newField.Type = LogLineType.Delimited;
+                    newField.EndingCharacter = ' ';
+
+                    if (!string.IsNullOrEmpty(paddingElement))
+                    {
+                        newField.MinWidth = long.Parse(paddingElement);
+                    }
+                }
+
+                newFields.Add(newField);
             }
 
-            newAppenderConversionPattern.NumberOfFieldsBeforeMessageField = numberOfFieldsBeforeMessage;
-            newAppenderConversionPattern.Delimiter = " ";
-
-            return newAppenderConversionPattern;
+            return newFields;
         }
 
         #endregion

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Log4Net.Extensions.Configuration.Implementation.LogObjects;
 
 namespace Log4Net.Extensions.Configuration.Implementation.ConfigObjects
 {
@@ -24,5 +25,10 @@ namespace Log4Net.Extensions.Configuration.Implementation.ConfigObjects
         /// The string value that separates all fields that proceed the message field.
         /// </summary>
         public string Delimiter { get; set; }
+
+        /// <summary>
+        /// The ordered enumerable of Field Names present in the <see cref="AppenderConversionPattern"/>
+        /// </summary>
+        public IEnumerable<LogLineField> Fields { get; set; }
     }
 }
