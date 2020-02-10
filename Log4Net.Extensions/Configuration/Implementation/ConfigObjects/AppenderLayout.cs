@@ -22,6 +22,6 @@ namespace Log4Net.Extensions.Configuration.Implementation.ConfigObjects
         /// <summary>
         /// The breakup of the physical log line.
         /// </summary>
-        public AppenderConversionPattern ConversionPattern { get; set; }
+        public AppenderConversionPattern ConversionPattern { get; set; }        
     }
 }

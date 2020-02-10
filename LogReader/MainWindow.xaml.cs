@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -17,6 +18,7 @@ using LogReader.Configuration;
 using LogReader.Forms;
 using LogReader.Log4Net;
 using LogReader.Structure;
+using WPF.BespokeControls.DataGrid;
 
 namespace LogReader
 {
@@ -234,6 +236,8 @@ namespace LogReader
             LineTextBox.Text = string.Empty;
             ManualScrollBar.IsEnabled = true;
             ManualScrollBar.Value = ManualScrollBar.Minimum;
+
+            Lines.UpdateColumns();
         }
 
         private void CurrentFileComboBox_OnSelected(object sender, RoutedEventArgs e)

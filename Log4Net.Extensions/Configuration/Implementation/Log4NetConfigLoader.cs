@@ -463,7 +463,7 @@ namespace Log4Net.Extensions.Configuration.Implementation
                 if (!string.IsNullOrEmpty(truncateElement))
                 {
                     newField.Type = LogLineType.FixedWidth;
-                    newField.FixedWidth = long.Parse(truncateElement);
+                    newField.FixedWidth = int.Parse(truncateElement);
                 }
                 else
                 {
@@ -472,7 +472,7 @@ namespace Log4Net.Extensions.Configuration.Implementation
 
                     if (!string.IsNullOrEmpty(paddingElement))
                     {
-                        newField.MinWidth = long.Parse(paddingElement);
+                        newField.MinWidth = int.Parse(paddingElement);
                     }
                 }
 

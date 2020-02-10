@@ -8,6 +8,7 @@
         xmlns:TextBox="clr-namespace:WPF.BespokeControls.TextBox;assembly=WPF.BespokeControls"
     xmlns:button="clr-namespace:WPF.BespokeControls.Button;assembly=WPF.BespokeControls"
     xmlns:converter="clr-namespace:WPF.BespokeControls.Converter;assembly=WPF.BespokeControls"
+    xmlns:datagrid="clr-namespace:WPF.BespokeControls.DataGrid;assembly=WPF.BespokeControls"
     x:Class="LogReader.MainWindow"
         mc:Ignorable="d"
         Title="Log Reader"
@@ -81,7 +82,8 @@
                    Grid.Column="3" 
                    Grid.Row="3" 
                    Margin="0,0,10,0"/>
-        <DataGrid x:Name="Lines"
+        <datagrid:DynamicColumnDataGrid x:Name="Lines"
+                  ColumnHeaders="{Binding ColumnHeaders}"
                   Visibility="{Binding RawDisplayMode, Converter={StaticResource InverseBoolToVisibilityConverter}}"
                   ItemsSource="{Binding LogLines}"
                   AutoGenerateColumns="False"
@@ -95,10 +97,7 @@
                   Grid.ColumnSpan="2"
                   CanUserResizeRows="False"
                   RowHeight="25">
-            <DataGrid.Columns>
-                <DataGridTextColumn Binding="{Binding Line}"/>
-            </DataGrid.Columns>
-        </DataGrid>
+        </datagrid:DynamicColumnDataGrid>
         <TextBlock x:Name="CurrentFileTextBlock" Text="Current File: " Grid.Column="1" Grid.Row="2" Width="Auto" Margin="0, 0, 0, 0" VerticalAlignment="Center" Visibility="{Binding FileControlVisibility}"/>
         <ComboBox x:Name="CurrentFileComboBox" Grid.Column="2" Grid.Row="2" Width="Auto" Margin="0, 0, 0, 0" ItemsSource="{Binding LogFileLocations}" Visibility="{Binding FileControlVisibility}" SelectedItem="{Binding CurrentLogFile}" SelectionChanged="CurrentFileComboBox_OnSelected"/>
         <Grid Visibility="Collapsed" x:Name="GotoPopup" Width="Auto" HorizontalAlignment="Left" VerticalAlignment="Bottom" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2">

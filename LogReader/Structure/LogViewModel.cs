@@ -12,6 +12,7 @@ using Akka.Actor;
 using Akka.Configuration;
 using Log4Net.Extensions.Configuration.Implementation;
 using Log4Net.Extensions.Configuration.Implementation.ConfigObjects;
+using Log4Net.Extensions.Configuration.Implementation.LogObjects;
 using LogReader.Akka.Net.Actors;
 using LogReader.Annotations;
 using LogReader.Configuration;
@@ -23,6 +24,7 @@ namespace LogReader.Structure
         #region Log4Net
 
         private Log4NetConfig _log4NetConfig;
+        private AppenderLayout _selectedAppenderLayout;
 
         #endregion
 
@@ -32,6 +34,7 @@ namespace LogReader.Structure
 
         private IActorRef _findStartingByteActor;
         private IActorRef _readLineFromFileActor;
+        private IActorRef _delimitLogLineActor;
         private IActorRef _updateDataSourceActor;
         private IActorRef _updateUIActor;
 
@@ -179,6 +182,17 @@ namespace LogReader.Structure
         
         #region UI
 
+        private ObservableCollection<string> _columnHeaders;
+        public ObservableCollection<string> ColumnHeaders
+        {
+            get { return _columnHeaders; }
+            set
+            {
+                _columnHeaders = value;
+                OnPropertyChanged(nameof(ColumnHeaders));
+            }
+        }
+
         /// <summary>
         /// The maximum scroll value based on the current sum total file size of all loaded Log Files.
         /// </summary>
@@ -304,10 +318,10 @@ namespace LogReader.Structure
             LogLines = new ObservableCollection<LogLine>();
             _logFiles = new List<LogFileInfo>();
             _searchResults = new List<SearchResult>();
+            _columnHeaders = new ObservableCollection<string>();
             _seamlessScroll = true;
 
             FileControlVisibility = Visibility.Collapsed;
-            SetupAkkaActorSystem();
         }
 
         #endregion
@@ -330,7 +344,10 @@ namespace LogReader.Structure
             Props updateDataSourceActorProps = Props.Create(() => new UpdateDataSourceActor(this)).WithDispatcher("akka.actor.synchronized-dispatcher");
             _updateDataSourceActor = _akkaActorSystem.ActorOf(updateDataSourceActorProps, $"updateDataSource_{Guid.NewGuid()}");
 
-            Props readLineFromFileActorProps = Props.Create(() => new ReadLineFromFileActor(_updateDataSourceActor));
+            Props delimitLogLineActorProps = Props.Create(() => new DelimitLogLineActor(_updateDataSourceActor, _selectedAppenderLayout));
+            _delimitLogLineActor = _akkaActorSystem.ActorOf(delimitLogLineActorProps, $"readLineFromFile_{Guid.NewGuid()}");
+
+            Props readLineFromFileActorProps = Props.Create(() => new ReadLineFromFileActor(_delimitLogLineActor));
             _readLineFromFileActor = _akkaActorSystem.ActorOf(readLineFromFileActorProps, $"readLineFromFile_{Guid.NewGuid()}");
 
             Props findStartingByteLocationActorProps = Props.Create(() => new FindByteLocationActor(_readLineFromFileActor));
@@ -442,6 +459,86 @@ namespace LogReader.Structure
             }
         }
 
+        public void AddLine(DelimitedLogLine delimitedLogLine)
+        {
+            UpdateLogLinesWithNewLine(delimitedLogLine);
+
+            _currentLineToUpdate++;
+            OnPropertyChanged(nameof(_currentLineToUpdate));
+            OnPropertyChanged(nameof(IsReading));
+
+            if (RawDisplayMode)
+            {
+                if (_currentLineToUpdate >= _logLines.Count)
+                {
+                    OnPropertyChanged(nameof(LogLineBlock));
+                }
+            }
+
+            if (IsReading
+                || ExpandingView)
+            {
+                long relativeReference =
+                    CreateRelativeByteReference(delimitedLogLine.LineEndsAtByteLocation,
+                        delimitedLogLine.FilePath);
+
+                _readLineFromFileActor.Tell(
+                    new ReadLineFromFileActorMessages.ReadLineFromFileStartingAtByte(
+                        LocateLogFileFromByteReference(relativeReference),
+                        TranslateRelativeBytePosition(relativeReference),
+                        false));
+            }
+        }
+
+        private void UpdateLogLinesWithNewLine(DelimitedLogLine lineToAdd)
+        {
+            if (!ExpandingView)
+            {
+                int zeroBasedLogLineIndex = Math.Max(0, _currentLineToUpdate - 1);
+
+                if (zeroBasedLogLineIndex < _logLines.Count)
+                {
+                    if (!SeamlessScroll)
+                    {
+                        if (lineToAdd.FilePath == CurrentLogFile)
+                        {
+                            _logLines[zeroBasedLogLineIndex] = CreateNewLogLine(lineToAdd);
+                        }
+                        else
+                        {
+                            ReadLineFromFileActor.ReturnedLine lastLine = new ReadLineFromFileActor.ReturnedLine
+                            {
+                                LineStartsAtByteLocation = _logLines[zeroBasedLogLineIndex - 1].StartingByte,
+                                LineEndsAtByteLocation = _logLines[zeroBasedLogLineIndex - 1].EndingByte,
+                                FilePath = CurrentLogFile,
+                                Line = ""
+                            };
+
+                            _logLines[zeroBasedLogLineIndex] = CreateNewLogLine(lastLine);
+                        }
+                    }
+                    else
+                    {
+                        _logLines[zeroBasedLogLineIndex] = CreateNewLogLine(lineToAdd);
+                    }
+                }
+            }
+            else
+            {
+                if (!SeamlessScroll)
+                {
+                    if (lineToAdd.FilePath == CurrentLogFile)
+                    {
+                        _logLines.Add(CreateNewLogLine(lineToAdd));
+                    }
+                }
+                else
+                {
+                    _logLines.Add(CreateNewLogLine(lineToAdd));
+                }
+            }
+        }
+
         private void UpdateLogLinesWithNewLine(ReadLineFromFileActor.ReturnedLine lineToAdd)
         {
             if (!ExpandingView)
@@ -500,11 +597,30 @@ namespace LogReader.Structure
             CurrentLogFile = line.FilePath;
             return new LogLine
             {
-                Line = line.Line,
+                RawLine = line.Line,
                 StartingByte = CreateRelativeByteReference(line.LineStartsAtByteLocation, line.FilePath),
                 EndingByte = CreateRelativeByteReference(line.LineEndsAtByteLocation, line.FilePath),
                 File = line.FilePath
             };
+        }
+
+        private LogLine CreateNewLogLine(DelimitedLogLine line)
+        {
+            CurrentLogFile = line.FilePath;
+            LogLine newLogLine = new LogLine
+            {                
+                Fields = new ObservableCollection<LogLineField>(),
+                StartingByte = CreateRelativeByteReference(line.LineStartsAtByteLocation, line.FilePath),
+                EndingByte = CreateRelativeByteReference(line.LineEndsAtByteLocation, line.FilePath),
+                File = line.FilePath
+            };
+
+            foreach(LogLineField field in line.Fields)
+            {
+                newLogLine.Fields.Add(field);
+            }
+
+            return newLogLine;
         }
 
         /// <summary>
@@ -660,7 +776,7 @@ namespace LogReader.Structure
         public void LoadLogFilesIntoLogViewModel(Log4NetConfig log4NetConfigToLoad)
         {
             _log4NetConfig = log4NetConfigToLoad;
-            LoadLogFiles();
+            LoadLogFiles();            
 
             FileControlVisibility = Visibility.Visible;
         }
@@ -669,6 +785,10 @@ namespace LogReader.Structure
         {
             Appender rollingFileAppender =
                 _log4NetConfig.AppendersOfType(AppenderType.RollingFileAppender).FirstOrDefault();
+
+            _selectedAppenderLayout = rollingFileAppender.Layout;
+
+            SetupAkkaActorSystem();
 
             if (null == rollingFileAppender)
             {
@@ -713,6 +833,8 @@ namespace LogReader.Structure
             }
 
             findStartingByteActor.Tell(PoisonPill.Instance);
+
+            LoadDataGridColumnHeaders(rollingFileAppender.Layout.ConversionPattern);
         }
 
         public void CreateNewSearchResult(string filePath, long byteStartLocation, byte[] itemFound)
@@ -752,6 +874,14 @@ namespace LogReader.Structure
 
             findStartingByteActor.Tell(new FindByteLocationActorMessages.FindByteOccurrencesWithinAFile(bytesToFind, filePath, updateUIActor, CreateNewSearchResult, stopActorAfterSearch));
             findStartingByteActor.Tell(PoisonPill.Instance);
+        }
+
+        private void LoadDataGridColumnHeaders(AppenderConversionPattern appenderConversionPattern)
+        {
+            foreach(LogLineField field in appenderConversionPattern.Fields)
+            {
+                ColumnHeaders.Add(field.Name);
+            }
         }
 
         #endregion

@@ -46,6 +46,7 @@ namespace LogReader.Akka.Net.Actors
         public class ReturnedLine
         {
             public string FilePath { get; set; }
+
             public string Line { get; set; }
 
             public long LineEndsAtByteLocation { get; set; }
@@ -60,11 +61,11 @@ namespace LogReader.Akka.Net.Actors
             public bool LastLine { get; set; }
         }
 
-        private IActorRef _updateDataSourceActor;
+        private IActorRef _delimitLogLineActor;
 
-        public ReadLineFromFileActor(IActorRef updateDataSourceActor)
+        public ReadLineFromFileActor(IActorRef delimitLogLineActor)
         {
-            _updateDataSourceActor = updateDataSourceActor ?? throw new ArgumentNullException(nameof(updateDataSourceActor));
+            _delimitLogLineActor = delimitLogLineActor ?? throw new ArgumentNullException(nameof(delimitLogLineActor));
         }
 
         protected override void OnReceive(object message)
@@ -74,7 +75,7 @@ namespace LogReader.Akka.Net.Actors
                 case ReadLineFromFileActorMessages.ReadLineFromFileStartingAtByte readLineFromFileMessage:
                 {
                     ReturnedLine returnedLine = ReadLineFromFile(readLineFromFileMessage);
-                    _updateDataSourceActor.Tell(new UpdateDataSourceActorMessage.AddLineToDataSource(returnedLine, readLineFromFileMessage.OverrideUI));
+                    _delimitLogLineActor.Tell(new DelimitLogLineActorMessages.DelimitLogLineMessage(returnedLine));
                     break;
                 }
             }
