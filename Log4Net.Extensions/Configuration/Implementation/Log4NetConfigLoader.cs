@@ -106,12 +106,23 @@ namespace Log4Net.Extensions.Configuration.Implementation
         {
             if (!appenderElement.Descendants().Any())
             {
-                throw new InvalidLog4NetConfigStructureException("<appender> node has no descendent nodes. Unable to proceed.");
+                return null;
+            }
+
+            AppenderType newAppenderType = AppenderType.RollingFileAppender;
+
+            try
+            {
+                newAppenderType = LoadAppenderTypeFromElement(appenderElement);
+            }
+            catch
+            {
+                return null;
             }
 
             Appender newAppender = new Appender
             {
-                Type = LoadAppenderTypeFromElement(appenderElement),
+                Type = newAppenderType,
                 FolderPath = LoadAppenderFolderPathFromElement(appenderElement),
                 RollingFileNameMask = LoadAppenderRollingFileMaskFromElement(appenderElement),
                 StaticFileNameMask = LoadAppenderStaticFileNameMaskFromElement(appenderElement),

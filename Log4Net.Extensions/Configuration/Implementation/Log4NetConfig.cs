@@ -39,6 +39,11 @@ namespace Log4Net.Extensions.Configuration.Implementation
         /// <param name="appenderToAdd">The <see cref="Appender"/> to add to <see cref="Log4NetConfig"/>.</param>
         public Appender AddAppender(Appender appenderToAdd)
         {
+            if (null == appenderToAdd)
+            {
+                return null;
+            }
+
             if (!_appenders.Contains(appenderToAdd))
             {
                 _appenders.Add(appenderToAdd);
